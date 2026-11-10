@@ -52,6 +52,9 @@ func Handler(svc *service.Service, log *zap.Logger) http.Handler {
 		// every request here needs a bearer token, which a rebinding page
 		// can't have.
 		DisableLocalhostProtection: true,
+		// The SDK's default is 4 MiB, far below one publish
+		// (limits.max_publish_bytes): larger publishes got 413 here.
+		MaxRequestBodyBytes: svc.Config().Limits.MaxRequestBytes(),
 	})
 	verify := func(ctx context.Context, token string, _ *http.Request) (*auth.TokenInfo, error) {
 		a, err := svc.Authenticate(ctx, token)

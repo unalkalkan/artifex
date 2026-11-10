@@ -124,8 +124,7 @@ func (s *Server) Handler(o Options) http.Handler {
 	mux.Handle("GET /static/", http.HandlerFunc(s.static))
 	mux.Handle("/c/", s.content)
 	if o.MCP != nil {
-		// A publish's files arrive as JSON, binary ones in base64 (4/3 larger).
-		limit := s.svc.Config().Limits.MaxPublishBytes*4/3 + 1<<20
+		limit := s.svc.Config().Limits.MaxRequestBytes()
 		mux.Handle("/mcp", s.limiter.wrap(http.MaxBytesHandler(o.MCP, limit)))
 	}
 	if o.Git != nil {

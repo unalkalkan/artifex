@@ -57,6 +57,9 @@ Writes, moves and deletes several files as one version.
 - If any of those files changed since its base, **nothing** is written: the error lists each file with its
   `current_blob` and `current_content`. Merge and publish again with `current_blob` as the base.
 - `move_to` may come with new content; threads follow the moved artifact.
+- The project must exist (`create_project`, or an earlier `upload_artifact`).
+- One publish holds up to `limits.max_publish_bytes` of files (50 MB by default), each up to
+  `limits.max_file_bytes` (25 MB). The request may be a third larger, for base64.
 
 ### `list_files`, `read_file`
 

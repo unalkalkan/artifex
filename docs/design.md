@@ -681,7 +681,9 @@ gives agents a short guide in its MCP instructions.
 ```
 
 - Binary files are sent as base64.
-- One publish is limited in size; the limit comes from configuration.
+- One publish is limited in size; the limit comes from configuration. `/mcp` accepts requests a third
+  larger plus 1 MiB, so a publish at the limit fits in base64 (`Limits.MaxRequestBytes`, used for both the
+  HTTP limit and the MCP SDK's own, whose 4 MiB default refused larger publishes).
 
 ---
 

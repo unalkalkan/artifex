@@ -123,6 +123,11 @@ func (c *Config) applyDefaults() {
 	}
 }
 
+// MaxRequestBytes is the largest request body /mcp accepts: one full publish
+// as JSON, with binary files in base64 (4/3 larger) and room for the JSON
+// around them.
+func (l Limits) MaxRequestBytes() int64 { return l.MaxPublishBytes*4/3 + 1<<20 }
+
 func (c *Config) validate() error {
 	u, err := url.Parse(c.BaseURL)
 	if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" || (u.Path != "" && u.Path != "/") {

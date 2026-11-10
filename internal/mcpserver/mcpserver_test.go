@@ -2,6 +2,7 @@ package mcpserver
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -155,5 +156,46 @@ func TestMCPEndToEnd(t *testing.T) {
 	}
 	if _, isErr, text := call(t, s2, "upload_artifact", map[string]any{"project": "mockups", "path": "y.html", "content": "y"}); !isErr || !strings.Contains(text, "editor") {
 		t.Fatalf("commenter published: %s", text)
+	}
+}
+
+// A publish up to limits.max_publish_bytes goes through /mcp, even though its
+// base64 request is a third larger and above the MCP SDK's 4 MiB default.
+func TestMCPLargePublish(t *testing.T) {
+	dir := t.TempDir()
+	cfg := &config.Config{BaseURL: "http://artifex.test", DataDir: dir}
+	cfg.Limits.MaxFileBytes, cfg.Limits.MaxPublishBytes = 8<<20, 8<<20
+	st, err := store.Open(filepath.Join(dir, "app.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.Close()
+	svc := service.New(cfg, st, events.NewHub(), zap.NewNop())
+	ctx := context.Background()
+	acct, _ := svc.AddAccount(ctx, "dev@x.test", "Dev", false)
+	tok, _ := svc.CreateToken(ctx, acct, "Claude")
+	srv := httptest.NewServer(Handler(svc, zap.NewNop()))
+	defer srv.Close()
+	s := connect(t, srv.URL, tok.Secret)
+	if _, isErr, text := call(t, s, "create_project", map[string]any{"project": "big"}); isErr {
+		t.Fatalf("create_project: %s", text)
+	}
+
+	file := base64.StdEncoding.EncodeToString(make([]byte, 7<<20)) // about 9.3 MiB as base64
+	_, isErr, text := call(t, s, "publish", map[string]any{"project": "big", "message": "Big", "changes": []any{
+		map[string]any{"path": "assets/big.bin", "content_base64": file},
+	}})
+	if isErr {
+		t.Fatalf("publish: %s", text)
+	}
+	// Over the publish limit, in a request still under the request limit
+	// (text isn't base64): the service refuses it with a readable error.
+	text5 := strings.Repeat("a", 5<<20)
+	_, isErr, text = call(t, s, "publish", map[string]any{"project": "big", "message": "Bigger", "changes": []any{
+		map[string]any{"path": "a.css", "content": text5},
+		map[string]any{"path": "b.css", "content": text5},
+	}})
+	if !isErr || !strings.Contains(text, "the limit is") {
+		t.Fatalf("over the limit: %v %s", isErr, text)
 	}
 }
