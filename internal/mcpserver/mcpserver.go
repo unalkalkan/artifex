@@ -15,33 +15,62 @@ import (
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"go.uber.org/zap"
 
+	"github.com/unalkalkan/artifex/internal/render"
 	"github.com/unalkalkan/artifex/internal/service"
+	"github.com/unalkalkan/artifex/internal/upload"
 )
 
 const instructions = `Artifex hosts HTML that you want to show people. People view it in a browser and comment on any spot; you make every change.
 
 Projects
 - A project is a private git repository with members. Roles: commenter (view, comment), editor (also publish and restore), owner (also manage members). list_projects shows yours.
-- upload_artifact creates the project if it doesn't exist yet; you become its owner. Project ids are lowercase letters, digits and dashes.
+- Writing to a project that doesn't exist yet (publish, upload_artifact, create_upload) creates it; you become its owner. Project ids are lowercase letters, digits and dashes.
 
 Publishing
 - An artifact is an HTML file. The browser draws it exactly as written, so write complete documents: <!doctype html>, <title> (shown as its name), and your CSS.
-- Artifacts may load files only from their own project: put stylesheets, scripts, fonts and images in the project and link them with relative paths. Links to other hosts (CDNs) are blocked. Use content_base64 for binary files.
-- <meta name="artifact" content="width=1440"> shows an artifact at a fixed width (mockups of screens). Without it, it fills the window like a web page.
+- Artifacts may load files only from their own project: put stylesheets, scripts, fonts and images in the project and link them with relative paths. Files on other hosts (CDNs) are blocked; the publish answer warns about them.
+- Give every artifact its size: <meta name="artifact" content="width=1440, height=900">. It is shown in exactly that window: a page sized to the window (100vh) fills it, and taller content scrolls inside it. Leave out height only for a page that should be as tall as its content, such as a report; leave out width only for a page that should fill the reader's window.
 - Link artifacts to each other with relative links (<a href="../other/page.html">); the viewer opens them in Artifex.
-- A folder can have folder.yaml (title, label, order) and the project project.yaml (title, description, open: the artifact to open first). A folder shows its artifacts together as a canvas.
-- To change or delete an existing file, pass its blob id as base: from read_file, list_files, or the files list of your last publish. If the file changed since, nothing is written and you get its current content to merge.
+- A folder can have folder.yaml (title, label, order: its artifacts and folders, in order), and the project project.yaml (title, description, open: the artifact to open first, order: the order of the project's top folder). A folder shows its artifacts together as a canvas.
+- To change or delete an existing file, pass its blob id as base: from read_file, list_files, or the files list of your last publish. If the file changed since, nothing is written and you get its current blob id, and its content to merge.
 - publish writes many files in one version; use it when files belong together. Every publish is a version people can compare and restore.
+
+Files on your disk
+- When a file is on your disk, don't put its content in a tool call, and never images, fonts or libraries: call create_upload, send the files with curl, then publish them by their upload ids. Their content never passes through the conversation.
+- One file: curl -sS -T <file> '<url><path in the project>'. A whole folder in one request: tar -C <folder> -czf - . | curl -sS -T - '<archive_url>'. The answer's changes are publish changes as they are; add a base to those that replace an existing file.`
+
+const screenshotInstructions = `
+
+Checking your work
+- screenshot shows an artifact as people see it, and lists what went wrong in it: files blocked or missing, script errors. Look at new and changed artifacts with it before you tell people they are ready.`
+
+const commentInstructions = `
 
 Comments
 - list_threads (state "open") shows what people asked for. get_thread shows the comment, the element it points at (CSS selector and text), the HTML around it, and whether the artifact changed since.
 - After changing an artifact for a thread, reply saying what you did and resolve it with the version from your publish.
 - Answer people in their language, briefly.`
 
+// Options wires what the tools need from other packages.
+type Options struct {
+	// Uploads makes upload addresses (create_upload; design decision 23).
+	Uploads *upload.Server
+	// Renderer draws artifacts for screenshot (design decision 24). Nil
+	// leaves the tool out.
+	Renderer render.Renderer
+	// ContentURL is an artifact's signed content address.
+	ContentURL func(project, commit, path string) string
+}
+
 // Handler returns the /mcp handler.
-func Handler(svc *service.Service, log *zap.Logger) http.Handler {
-	s := mcp.NewServer(&mcp.Implementation{Name: "artifex", Title: "Artifex", Version: "1.0.0"}, &mcp.ServerOptions{Instructions: instructions})
-	t := &tools{svc: svc, log: log}
+func Handler(svc *service.Service, log *zap.Logger, o Options) http.Handler {
+	guide := instructions
+	if o.Renderer != nil {
+		guide += screenshotInstructions
+	}
+	guide += commentInstructions
+	s := mcp.NewServer(&mcp.Implementation{Name: "artifex", Title: "Artifex", Version: "1.0.0"}, &mcp.ServerOptions{Instructions: guide})
+	t := &tools{svc: svc, log: log, o: o}
 	t.register(s)
 	h := mcp.NewStreamableHTTPHandler(func(*http.Request) *mcp.Server { return s }, &mcp.StreamableHTTPOptions{
 		Stateless:    true,
@@ -69,6 +98,7 @@ func Handler(svc *service.Service, log *zap.Logger) http.Handler {
 type tools struct {
 	svc *service.Service
 	log *zap.Logger
+	o   Options
 }
 
 func actorOf(req *mcp.CallToolRequest) (service.Actor, error) {
@@ -146,9 +176,24 @@ type uploadIn struct {
 }
 
 type publishIn struct {
-	Project string               `json:"project" jsonschema:"project id"`
+	Project string               `json:"project" jsonschema:"project id; the project is created if it doesn't exist"`
 	Message string               `json:"message,omitempty" jsonschema:"what changed, shown in the history"`
 	Changes []service.FileChange `json:"changes" jsonschema:"files to write, move or delete, all in one version"`
+	Title   string               `json:"title,omitempty" jsonschema:"project title, used only when this publish creates the project"`
+}
+
+type createUploadIn struct {
+	Project string `json:"project" jsonschema:"project id; the project is created if it doesn't exist"`
+	Title   string `json:"title,omitempty" jsonschema:"project title, used only when this creates the project"`
+}
+
+type screenshotIn struct {
+	Project string `json:"project" jsonschema:"project id"`
+	Path    string `json:"path" jsonschema:"the artifact: an HTML file"`
+	Version string `json:"version,omitempty" jsonschema:"version id; empty for the latest"`
+	Width   int    `json:"width,omitempty" jsonschema:"window width in pixels; default: the artifact's own width, else 1440"`
+	Height  int    `json:"height,omitempty" jsonschema:"window height in pixels; default: the artifact's own height, else the frame follows the content, as in Artifex"`
+	Y       int    `json:"y,omitempty" jsonschema:"start the picture this many pixels down, for the rest of a tall artifact"`
 }
 
 type listFilesIn struct {
@@ -245,7 +290,7 @@ func (t *tools) register(s *mcp.Server) {
 			ps, err := svc.ListProjects(ctx, a)
 			return map[string]any{"projects": ps}, err
 		})
-	add(s, t, "create_project", "Create an empty project. You become its owner. upload_artifact also creates the project when it doesn't exist.", false,
+	add(s, t, "create_project", "Create an empty project. You become its owner. publish, upload_artifact and create_upload also create the project when it doesn't exist.", false,
 		func(ctx context.Context, a service.Actor, in createProjectIn) (any, error) {
 			return svc.CreateProject(ctx, a, in.Project, in.Title)
 		})
@@ -253,10 +298,42 @@ func (t *tools) register(s *mcp.Server) {
 		func(ctx context.Context, a service.Actor, in uploadIn) (any, error) {
 			return svc.UploadArtifact(ctx, a, in.Project, in.Path, in.Content, in.ContentBase64, in.Base, in.Title, in.Message)
 		})
-	add(s, t, "publish", "Write, move and delete several files as one version. Each change to an existing file needs its base blob id; if any changed since, nothing is written and the current content comes back. Threads follow moved artifacts.", false,
+	add(s, t, "publish", "Write, move and delete several files as one version, creating the project if it doesn't exist. A change has content, content_base64, or the upload id of a file sent to an upload address (create_upload). Each change to an existing file needs its base blob id; if any changed since, nothing is written and the current blob ids come back. Threads follow moved artifacts.", false,
 		func(ctx context.Context, a service.Actor, in publishIn) (any, error) {
-			return svc.Publish(ctx, a, in.Project, in.Message, in.Changes)
+			return svc.PublishOrCreate(ctx, a, in.Project, in.Title, in.Message, in.Changes)
 		})
+	if t.o.Uploads != nil {
+		add(s, t, "create_upload", "Get a short-lived address to send files from your disk with curl, so their content never passes through the conversation: one file to url + its path, or a whole folder as a tar to archive_url. Each upload answers with publish changes ({path, upload}); publish them to make a version. Creates the project if it doesn't exist.", false,
+			func(ctx context.Context, a service.Actor, in createUploadIn) (any, error) {
+				created, err := svc.EnsureProject(ctx, a, in.Project, in.Title)
+				if err != nil {
+					return nil, err
+				}
+				if _, err := svc.Require(ctx, a, in.Project, "editor"); err != nil {
+					return nil, err
+				}
+				addr := t.o.Uploads.Create(a, in.Project)
+				addr.ProjectCreated = created
+				return addr, nil
+			})
+	}
+	if t.o.Renderer != nil {
+		mcp.AddTool(s, &mcp.Tool{
+			Name:        "screenshot",
+			Description: "See an artifact as people see it in Artifex: a picture of it, drawn in a browser under the same rules, and a list of what went wrong (files blocked or missing, script errors). It is drawn at its own width and height, unless you pass others.",
+			Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true},
+		}, func(ctx context.Context, req *mcp.CallToolRequest, in screenshotIn) (*mcp.CallToolResult, any, error) {
+			a, err := actorOf(req)
+			if err != nil {
+				return errorResult(err.Error()), nil, nil
+			}
+			res, err := t.screenshot(ctx, a, in)
+			if err != nil {
+				return t.fail("screenshot", a, err), nil, nil
+			}
+			return res, nil, nil
+		})
+	}
 	add(s, t, "list_files", "List a folder of a project at a version, with each file's blob id and size.", true,
 		func(ctx context.Context, a service.Actor, in listFilesIn) (any, error) {
 			v, files, err := svc.ListFiles(ctx, a, in.Project, in.Path, in.Version, in.Recursive)

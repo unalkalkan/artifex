@@ -121,8 +121,10 @@
   });
 
   /* ---------- frames ----------
-   * A Frame is one artifact iframe that the page sizes from the bridge's
-   * reports. Fixed-width artifacts are scaled to the zoom; others fill the box. */
+   * A Frame is one artifact iframe. An artifact with its own height (design
+   * decision 12) is shown exactly that tall, and its content scrolls inside
+   * it; others are sized from the bridge's reports. Fixed-width artifacts are
+   * scaled to the zoom; others fill the box. */
   var frames = [];
   function Frame(iframe, box, width, opts) {
     this.iframe = iframe;
@@ -133,10 +135,11 @@
     this.opts = opts || {};
     this.growth = [];
     this.locked = false;
+    this.fixed = this.opts.height || 0;
     frames.push(this);
     if (this.width) iframe.style.width = this.width + 'px';
     else iframe.style.width = '100%';
-    iframe.style.height = (this.opts.minHeight || 600) + 'px';
+    iframe.style.height = (this.fixed || this.opts.minHeight || 600) + 'px';
   }
   Frame.prototype.post = function (type, data) {
     var m = data || {};
@@ -148,7 +151,7 @@
     this.layout();
   };
   Frame.prototype.layout = function () {
-    var hgt = this.height || (this.opts.minHeight || 600);
+    var hgt = this.fixed || this.height || (this.opts.minHeight || 600);
     this.iframe.style.height = hgt + 'px';
     if (this.width) {
       this.iframe.style.transform = this.scale === 1 ? '' : 'scale(' + this.scale + ')';
@@ -163,6 +166,7 @@
   // Some pages size themselves to the window (100vh). Growing the iframe to
   // fit them makes them grow again, without end: stop once the growth repeats.
   Frame.prototype.onSize = function (height) {
+    if (this.fixed) { this.layout(); if (this.opts.onSize) this.opts.onSize(this); return; }
     if (this.locked && height > this.height) return;
     var now = Date.now(), d = height - this.height;
     if (this.height && d > 0) {
@@ -254,6 +258,7 @@
     if (!cfg.width) stage.classList.add('fill');
 
     var frame = new Frame(iframe, box, cfg.width, {
+      height: cfg.height || 0,
       minHeight: Math.max(400, stage.clientHeight - 48),
       lockHeight: Math.max(400, stage.clientHeight - 48),
       on: {
@@ -486,7 +491,8 @@
     if (!canvas) return;
     var list = $all('.board', canvas).map(function (sec) {
       var w = parseInt(sec.dataset.width, 10) || 1440;
-      return new Frame($('iframe', sec), $('.board-box', sec), w, { minHeight: 900, lockHeight: 1200, on: { open: openFromArtifact(cfg) } });
+      var hgt = parseInt(sec.dataset.height, 10) || 0;
+      return new Frame($('iframe', sec), $('.board-box', sec), w, { height: hgt, minHeight: 900, lockHeight: 1200, on: { open: openFromArtifact(cfg) } });
     });
     var zoom = zoomControl('#zoom', 'artifex.canvasZoom', fit);
     function fit() {
@@ -521,10 +527,11 @@
     var c = $('#compare');
     if (!c) return;
     var w = parseInt(c.dataset.width, 10) || 0;
+    var hgt = parseInt(c.dataset.height, 10) || 0;
     var list = $all('figure', c).map(function (fig) {
       var iframe = $('iframe', fig);
       if (!iframe) return null;
-      return new Frame(iframe, $('.board-box', fig), w || 1280, { minHeight: 600, lockHeight: 900 });
+      return new Frame(iframe, $('.board-box', fig), w || 1280, { height: hgt, minHeight: 600, lockHeight: 900 });
     }).filter(Boolean);
     function fit() {
       list.forEach(function (f) { f.setScale(Math.min(1, f.box.parentElement.clientWidth / f.width)); });

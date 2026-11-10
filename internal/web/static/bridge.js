@@ -4,7 +4,8 @@
  * with no origin of its own, so this script talks to the app only through
  * postMessage. It:
  *  - reports the artifact's height, so the app sizes the iframe and the page,
- *    not the artifact, scrolls;
+ *    not the artifact, scrolls (unless the artifact has a height of its own:
+ *    then the app keeps its frame that tall and the artifact scrolls itself);
  *  - turns clicks on links to other files of the project into "open" messages;
  *  - in comment mode, highlights the element under the pointer and reports the
  *    clicked element (CSS selector and text) and point;
@@ -57,6 +58,13 @@
   var lastWidth = 0;
   function schedule() { if (!frame) frame = requestAnimationFrame(measure); }
 
+  // The artifact scrolls itself when its frame is shorter than its content:
+  // it has a height of its own (design decision 12).
+  function scrollsItself() {
+    var d = document.documentElement;
+    return !!d && d.scrollHeight > window.innerHeight + 1;
+  }
+
   function watchSize() {
     if (window.ResizeObserver) {
       var ro = new ResizeObserver(schedule);
@@ -80,6 +88,7 @@
     var href = a.getAttribute('href');
     if (!href) return;
     if (href.charAt(0) === '#') {
+      if (scrollsItself()) return; // the browser scrolls the artifact itself
       // The page scrolls, not the artifact: ask the app to scroll to the target.
       var id = decodeURIComponent(href.slice(1));
       var el = id ? document.getElementById(id) : document.body;
@@ -243,10 +252,23 @@
         b.addEventListener('click', function (e) { e.preventDefault(); e.stopPropagation(); send('pin', { id: id }); });
       })(p.id);
       pinLayer.appendChild(b);
-      placed.push({ id: p.id, x: x, y: y, moved: moved });
+      // y in the frame: what the app scrolls its page by.
+      placed.push({ id: p.id, x: x, y: y - window.scrollY, docY: y, moved: moved });
     }
     send('placed', { pins: placed });
     placing = false;
+  }
+
+  // In an artifact that scrolls itself, bring the active pin into view.
+  function reveal() {
+    if (!activePin || !pinLayer || !scrollsItself()) return;
+    var pin = pinLayer.querySelector('.pin.active');
+    if (!pin) return;
+    var y = parseFloat(pin.style.top) || 0;
+    if (y < window.scrollY + 30 || y > window.scrollY + window.innerHeight - 30) {
+      window.scrollTo(0, Math.max(0, y - window.innerHeight / 3));
+      placePins(); // report the pins' new place in the frame
+    }
   }
 
   /* ---------- messages from the app ---------- */
@@ -257,7 +279,7 @@
     switch (m.type) {
       case 'artifex:mode': setMode(m.comment); break;
       case 'artifex:pins': ensureOverlay(); pinData = m.pins || []; placePins(); break;
-      case 'artifex:focus': activePin = m.id || 0; placePins(); break;
+      case 'artifex:focus': activePin = m.id || 0; placePins(); reveal(); break;
       case 'artifex:measure': lastHeight = 0; schedule(); break;
     }
   });

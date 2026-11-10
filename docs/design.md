@@ -9,8 +9,9 @@ and comment on any spot.
 - It works like Claude's artifacts: the published page is the HTML itself, and the browser draws it.
 
 **How to read this:** §1 lists the requirements and how they are met. §2 holds every decision, each with its
-reasons, what was rejected, and what changes if it is reversed. §3–§8 describe the system as built, §9–§11
-what it doesn't do, §12 how it was built and checked, and §13 where things are in the code.
+reasons, what was rejected, and what changes if it is reversed. §3–§8 describe the system as built, §9 the
+roadmap, §10 how to run it, §11 what is out of scope, §12 how it was built and checked, and §13 where things
+are in the code.
 
 ---
 
@@ -32,6 +33,8 @@ what it doesn't do, §12 how it was built and checked, and §13 where things are
 | **project role** | What an account may do in one project: **Owner**, **Editor** or **Commenter** (decision 16) |
 | **agent** | A program that uses an account's token over MCP. Usually Claude Code |
 | **bridge** | The small script the server adds to every artifact it serves (§4.4) |
+| **upload address** | A short-lived address where an agent sends files from its disk, outside the conversation (decision 23) |
+| **renderer** | The browser, in a container of its own, that draws artifacts for screenshots (decision 24) |
 
 In mockup terms, a **board** is an artifact, and a **page** of boards is a folder.
 
@@ -145,8 +148,9 @@ agent wants to show (decision 5). Everything below holds for mockups too.
     is not connected to GitHub or any other remote.
   - The folder's files are kept equal to the latest version, so anyone looking at the host sees the current
     files. Artifex itself never reads them: every read names a commit and comes from git's objects.
-  - An agent creates a project by uploading to it (`upload_artifact`) or with `create_project`. The creator
-    becomes the project's Owner.
+  - An agent creates a project by writing to it (`publish`, `upload_artifact`, `create_upload`) or with
+    `create_project`. The creator becomes the project's Owner. A publish is checked before the project is
+    created, so one that can't succeed creates nothing.
   - Accounts, project roles, tokens and threads live in Artifex's SQLite database.
 - **Why:**
   - A project is private to its members (decision 16). Artifex can only enforce that if it holds the
@@ -233,9 +237,12 @@ agent wants to show (decision 5). Everything below holds for mockups too.
   - The agent interface is an MCP server at `/mcp`, over the Streamable HTTP transport. It authenticates with
     bearer tokens (decision 17). §7 lists the tools.
   - Agents get no separate CLI. The binary's subcommands are for running the server (`serve`, `admin`).
-  - Git over HTTPS is a second, optional way in, for agents with a shell:
+  - Git over HTTPS is a second, optional way in, for people and scripts with a shell:
     `https://token:<token>@<host>/git/<project>.git`. Fetching needs the Commenter role and pushing the Editor
     role.
+  - **The agents' instructions never mention git.** Files on an agent's disk go through upload addresses
+    (decision 23). A push skips what a publish checks: the per-file size limit, the path rules and the
+    warnings (decision 6b), so it isn't the way an agent should publish.
 - **Why:**
   - MCP is the interface agents already speak, and it works for agents with no shell.
   - Claude Code connects with
@@ -310,20 +317,36 @@ agent wants to show (decision 5). Everything below holds for mockups too.
 
 - **Decision:**
   - An artifact's title is its `<title>`, or its file name when the tag is missing.
-  - `<meta name="artifact" content="width=1440">` gives it a fixed width, as a mockup screen needs. Without
-    the tag it fills the window like an ordinary web page, and in a canvas it is shown 1440 wide.
-  - Its height follows its content.
-  - A folder can have a `folder.yaml` with a title, the order of its artifacts and a label. It is optional.
-  - A project can have a `project.yaml` with a title and the artifact to open first; the default is
-    `index.html`.
+  - `<meta name="artifact" content="width=1440, height=900">` gives it a fixed size, as a mockup screen
+    needs. Without a width it fills the window like an ordinary web page, and in a canvas it is shown 1440
+    wide.
+  - **A height is taken as given.** The artifact is shown in a frame exactly that tall, as in a window of
+    that size: a page sized to the window (`100vh`) fills it, and taller content scrolls inside the frame.
+    Without a height, the frame follows the content. The agents' instructions ask for a height on every
+    artifact except pages that should be as tall as their content, such as reports.
+  - A folder can have a `folder.yaml` with a title, a label and an `order`: the names of its artifacts and
+    folders, in the order they are shown. It is optional.
+  - A project can have a `project.yaml` with a title, the artifact to open first (the default is
+    `index.html`) and an `order` for the project's top folder. It is used over a top-level `folder.yaml`'s
+    order.
 - **Why:**
   - Everything about an artifact is in one file, so nothing elsewhere can disagree with it.
-  - The YAML files only set order and wording. An artifact they don't list still shows, after the listed
-    ones. A listed artifact that doesn't exist only produces a warning in the publish answer.
+  - The YAML files only set order and wording. An artifact or folder they don't list still shows, after the
+    listed ones, by name. A listed name that doesn't exist only produces a warning in the publish answer.
+  - **A height is taken as given** because a frame that follows its content can't size a page that sizes
+    itself to the window: the frame grows, the page grows with it, and the frame has to stop at a height of
+    its own choosing. Each view chose another (900 pixels on a canvas, the window's height alone, 600 when
+    comparing), so the same screen looked different in each. The agent knows the screen it means; with its
+    height, every view and every screenshot (decision 24) shows that screen the same way.
+  - **Folders have an order** because they were listed by name, so a project's main section could come
+    last. `order` already ordered artifacts; it names folders too, and `project.yaml` holds it for the top
+    folder, where people look for the project's own settings.
   - **A label belongs to the folder, not to the artifact.** A mockups project can put proposals in folders
     labelled "Proposal". A proposal can then never sit among the screens that show what exists, because the
     folder decides what its artifacts are. To promote a proposal, an agent moves its file into another
     folder.
+- **If reversed:** without heights, window-sized pages depend on each view's stopping height again, and
+  agents pin heights inside their own CSS. Without folder order, folders go back to alphabetical.
 
 ### Decision 13 — Links between artifacts are ordinary relative links
 
@@ -475,6 +498,90 @@ agent wants to show (decision 5). Everything below holds for mockups too.
 - **If reversed:** every template uses Tabler's classes, so leaving Tabler means rewriting all of them and
   `app.css`. Artifacts are not affected: they bring their own styles (decision 11).
 
+### Decision 23 — Files on an agent's disk go through upload addresses
+
+- **Decision:**
+  - `create_upload(project)` returns a short-lived address. The agent sends files to it with curl, outside
+    the conversation: one file to `<address><path>`, or a whole folder as one tar, gzipped or not, to
+    `<address>-/archive`.
+  - Each upload stores blobs in the project's repository and answers with publish changes,
+    `{path, upload}`, where `upload` is the blob's id. Nothing refers to the blobs until a publish names
+    them, so an upload changes nothing anyone sees.
+  - A publish change may carry `upload` instead of `content`. Every other rule of a publish holds: bases,
+    conflicts, sizes, warnings, one commit.
+  - The address is signed for the project, the account and the token, and expires after 15 minutes
+    (`limits.upload_url_ttl`). Every request checks again that the account is active, the token not
+    revoked and the role still Editor, so revoking a token stops its addresses at once.
+  - Like `publish`, `create_upload` creates a project that doesn't exist (decision 6).
+- **Why:**
+  - MCP tools take their input inside the conversation. A 620 KB stylesheet is some 150,000 tokens, and a
+    few megabytes of images in base64 are out of an agent's reach. Claude's own Artifact tool reads a file
+    from disk instead, for the same reason.
+  - The first real project, 183 files and 7.6 MB, took ten hand-scripted publishes of 3.7 MB each. Through
+    an upload address it is one `tar | curl` of 0.7 seconds and a 17 KB publish.
+  - A tar is one request for any number of files, so a site doesn't run into the rate limit (decision 18)
+    file by file.
+  - Content-addressed blobs need no table: the id is git's own, any blob of the project is one its members
+    can read anyway, and a publish naming a blob it doesn't have is refused.
+  - A conflict on an uploaded file doesn't carry the current content back (it does for content sent inline,
+    up to 1 MB per answer): the sender works from its disk, and `read_file` is there when it needs to merge.
+- **Rejected:**
+  - **Telling agents to `git push`** (decision 9): a push skips the publish's checks, and an agent with only
+    MCP has no git.
+  - **An upload that publishes by itself:** a publish needs a base for every file it replaces, and a message;
+    keeping the two steps keeps one way of publishing.
+  - **A staging area per upload, kept in the database:** more state, and an upload id per address instead of
+    per file would hide which file is which.
+- **Costs:** an upload never published stays in the repository as an unreferenced blob until git removes it,
+  two weeks later at the soonest. An Editor could fill the disk with them, as they already could with
+  publishes.
+- **If reversed:** files travel through the conversation again, and large ones can't be published by an
+  agent with only MCP.
+
+### Decision 24 — Screenshots, drawn by a browser in a container of its own
+
+- **Decision:**
+  - `screenshot(project, path, version?, width?, height?, y?)` returns a picture of an artifact and a list
+    of what went wrong in it: loads the content policy blocked, project files that don't exist, script
+    errors and console errors.
+  - It draws the artifact as Artifex shows it: at its own width and height (decision 12), unless the agent
+    asks for others. Without a height, the frame follows the content and stops a page that grows with its
+    window at 1200 pixels, as a canvas does. A tall frame comes in pieces of 1600 pixels; `y` asks for the
+    next.
+  - Headless Chromium draws it, one fresh browser and profile per screenshot, at most two at a time. The
+    browser answers every request the page makes from Artifex itself: content and the bridge are served as
+    they are to people, with the same content policy and sandbox (decisions 10 and 11), and anything else is
+    refused. So the browser needs no network.
+  - In production the browser runs in a container of its own, `artifex renderer`, built from the same image
+    with Chromium added: no volumes, no secrets, a read-only file system, no capabilities, and a network it
+    shares only with Artifex. Artifex sends it the signed content address; it fetches only `/c/` and
+    `/static/` from Artifex.
+  - `screenshots.renderer` turns the tool on: the renderer's address, or `local` for a Chromium on the same
+    host, for development. Without it, agents don't see the tool.
+  - The browser is driven over `--remote-debugging-pipe` with the standard library: no new dependency.
+- **Why:**
+  - An agent publishing without seeing the result can't tell a broken layout, a blocked CDN script or a
+    missing image from a working page. Claude Design checks what it renders; the agent of an Artifex project
+    should be able to as well, without bringing a browser of its own.
+  - The list of problems is the part the picture can't show: why something is missing.
+  - **Its own container:** the browser runs pages anyone with the Editor role published, scripts included.
+    Chromium's own sandbox needs Linux user namespaces, which containers usually lack, so in a container it
+    runs without it. Next to Artifex, a page that broke out of the browser would find the database, the
+    signing key and every project. In its own container, it finds nothing.
+- **Rejected:**
+  - **Chromium in Artifex's own container:** see above. It would also make Artifex's image four times
+    larger for everyone, screenshots or not.
+  - **Rendering in the agent's browser or a hosted service:** not what people see, and a third party would
+    see every artifact.
+  - **A CDP library such as chromedp:** a dependency for a few commands the pipe carries as plain JSON.
+- **Costs:**
+  - The renderer's image is about 1.1 GB, against 270 MB for Artifex's. A screenshot takes about a second
+    and a few hundred MB of memory while it runs.
+  - System fonts: a font the artifact doesn't bring is drawn with the renderer's fonts (Liberation, Noto
+    Color Emoji), which may differ from a reader's. Artifacts that bring their fonts (decision 11) look the
+    same.
+- **If reversed:** agents check their work with their own tools, or not at all.
+
 ---
 
 ## 3. A project's repository
@@ -517,10 +624,19 @@ weekly-kpis/
 # settings/folder.yaml
 title: Settings
 label: ""            # e.g. Proposal; shown on every artifact in this folder
-order:               # order only; artifacts not listed here come after these
+order:               # artifacts and folders; the ones not listed follow by name
   - profile
   - billing
   - billing-loading
+  - archive/         # a folder; the slash is optional
+```
+
+```yaml
+# project.yaml
+title: App mockups
+description: Every screen of the app, as it is and as proposed.
+open: settings/profile.html
+order: [settings, proposals]   # the top folder's order
 ```
 
 ### 3.3 The head of a mockup artifact
@@ -530,7 +646,7 @@ order:               # order only; artifacts not listed here come after these
 <html lang="en">
 <head>
   <title>Billing</title>
-  <meta name="artifact" content="width=1440">
+  <meta name="artifact" content="width=1440, height=900">
   <link rel="stylesheet" href="../assets/tabler-1.0.0-beta20/css/tabler.min.css">
   <link rel="stylesheet" href="../assets/app.css">
 </head>
@@ -563,7 +679,8 @@ The server adds one script to every artifact it serves. The files in the reposit
 script talks to the app through `postMessage`:
 
 - **Size:** it reports the artifact's height, so the iframe fits the content. The page scrolls, not the
-  artifact.
+  artifact. An artifact with its own height keeps its frame that tall instead, and scrolls itself; the bridge
+  then scrolls it to a thread's pin, and leaves `#anchor` links to the browser.
 - **Comment mode:** it highlights the element under the pointer. On a click, it sends that element's selector,
   its text and the point.
 - **Pins:** it draws pins at the positions the app sends it.
@@ -656,10 +773,12 @@ gives agents a short guide in its MCP instructions.
 |---|---|---|
 | `list_projects` | any | The projects the account belongs to, with its role in each |
 | `create_project(project, title)` | any account | Creates the repository. The caller becomes its Owner |
+| `create_upload(project, title?)` | Editor | An upload address for files on the agent's disk (decision 23). Creates the project when it doesn't exist |
 | `upload_artifact(project, path, content, base, …)` | Editor | Writes one file as a version. Creates the project when it doesn't exist; the caller becomes its Owner |
 | `list_files(project, path?, version?)` | Commenter | Files and folders, with each file's blob id |
 | `read_file(project, path, version?)` | Commenter | One file's content and its blob id, which is the `base` for `publish` |
-| `publish(project, message, changes)` | Editor | Writes, moves and deletes files as one commit (decision 7). Returns the version, the addresses of changed artifacts, and warnings |
+| `publish(project, message, changes, title?)` | Editor | Writes, moves and deletes files as one commit (decision 7). Creates the project when it doesn't exist. Returns the version, the addresses of changed artifacts, and warnings |
+| `screenshot(project, path, version?, width?, height?, y?)` | Commenter | A picture of an artifact as people see it, and what went wrong in it (decision 24). Only when a renderer is configured |
 | `history(project, path?, limit?)` | Commenter | Versions, newest first |
 | `diff(project, from, to, path?)` | Commenter | The source diff between two versions |
 | `restore(project, version, path?)` | Editor | Publishes the old content as a new commit (§6.3) |
@@ -676,11 +795,16 @@ gives agents a short guide in its MCP instructions.
 ```json
 { "path": "billing.html", "content": "<!doctype html>…", "base": "3f2a…" }
 { "path": "fonts/inter.woff2", "content_base64": "…" }
+{ "path": "assets/app.css", "upload": "8c41…" }
 { "path": "old/name.html", "move_to": "new/name.html", "base": "9c1e…" }
 { "path": "draft.html", "delete": true, "base": "77b0…" }
 ```
 
-- Binary files are sent as base64.
+- Binary files are sent as base64, or, better, through an upload address (decision 23).
+- **Warnings** list what will go wrong when the files are viewed: references to files that don't exist, files
+  on other hosts that the content policy will block (scripts, stylesheets, images, fonts, CSS `url()` and
+  `@import`), paths starting with `/` (they point at the Artifex server, not the project), and YAML entries
+  naming nothing. They never stop a publish.
 - One publish is limited in size; the limit comes from configuration. `/mcp` accepts requests a third
   larger plus 1 MiB, so a publish at the limit fits in base64 (`Limits.MaxRequestBytes`, used for both the
   HTTP limit and the MCP SDK's own, whose 4 MiB default refused larger publishes).
@@ -693,21 +817,30 @@ gives agents a short guide in its MCP instructions.
   - HttpOnly session cookies with `SameSite=Lax`. Only a hash of the session id is stored.
   - A CSRF token on every form, and on every request that changes something, plus an `Origin` check.
   - The app's own pages carry a strict CSP: scripts only from the app, no inline scripts, no framing.
-- **Agents:** bearer tokens on `/mcp`. Tokens are stored hashed.
+- **Agents:** bearer tokens on `/mcp`. Tokens are stored hashed. Upload addresses act as the token they were
+  made with, for 15 minutes, and only store blobs (decision 23).
 - **Content:** never served on the strength of the session cookie. Only signed addresses can fetch it, and it
   runs isolated (decision 10).
-- **Rate limits:** on sign-in, MCP, git and the pages' API (decision 18).
+- **Rate limits:** on sign-in, MCP, uploads, git and the pages' API (decision 18).
+- **Screenshots:** the browser that runs published pages for them is in a container of its own, with nothing
+  to take (decision 24).
 - **Paths:** every path a tool receives is cleaned and kept inside its project. `..`, absolute paths and
   `.git` are refused.
 
 ---
 
-## 9. Not built yet
+## 9. Not built yet: the roadmap
 
 - **OAuth for MCP clients.** The connectors in claude.ai and Claude Desktop sign in with OAuth, so they can't
   connect until Artifex offers it. Claude Code and any client that sends a token header work now
   (decision 9).
 - **Notifications** (decision 19).
+- **Runtime features for artifacts**, the way some Claude artifacts have them: storing data, sharing state
+  between viewers, knowing who is viewing, taking files people add, asking an AI model a question. Mockups
+  don't need them; polls, checklists and prototypes that save what people do would. It is the largest change
+  here: an artifact has no origin and no session on purpose (decision 10), so each feature needs an API the
+  bridge offers, with its own permission checks. **It will be planned in full, as its own design, before any
+  of it is built.**
 
 ---
 
@@ -715,6 +848,8 @@ gives agents a short guide in its MCP instructions.
 
 - **Container:** one, with git installed (decision 8). It listens on plain HTTP behind a reverse proxy
   (decision 18). `Dockerfile` and `compose.yaml` are in the repository; `README.md` has the steps.
+- **Renderer, for screenshots:** a second container from the same `Dockerfile` (`--target renderer`), on a
+  network of its own with Artifex (decision 24). Leaving it out leaves out the screenshot tool, nothing else.
 - **Volume:**
   - `data/app.db`: SQLite, holding accounts, project roles, tokens and threads;
   - `data/projects/<project>/`: one folder with git initialised per project (decision 6);
@@ -724,7 +859,8 @@ gives agents a short guide in its MCP instructions.
   - the public address;
   - the Google OAuth client and the allowed domains;
   - the key that signs content addresses;
-  - limits: file and publish size, address lifetime, session lifetime, rate limits.
+  - limits: file and publish size, content and upload address lifetimes, session lifetime, rate limits;
+  - the screenshot renderer.
 - **Backups:** `artifex admin backup <dir>` writes a consistent copy of the SQLite file (`VACUUM INTO`) and a
   `git bundle` of each project into a new dated folder. Copying it off the host is up to the operator.
 - **Logs:** structured, with `zap`, to stdout.
@@ -740,8 +876,6 @@ gives agents a short guide in its MCP instructions.
 - Generating production code from artifacts.
 - Webhooks and notifications (decision 19).
 - Access for people without an account (decision 15).
-- Runtime features for artifacts, such as shared data, file uploads or an artifact asking an AI model a
-  question, the way some Claude artifacts can.
 - **Later, perhaps:** branch previews, where an agent's unmerged branch shows as a version of its own.
 
 ---
@@ -764,13 +898,21 @@ Artifex was built in three phases.
   image, the compose file, `artifex admin backup` and `artifex healthcheck`.
 - **After phase 3.** The Tabler look (decision 22), with a confirmation dialog in place of the browser's,
   and gzipped static files. Artifacts may no longer navigate the page on their own (decision 10).
+- **After the first real project,** 23 screens moved in from another design tool: upload addresses
+  (decision 23) and screenshots (decision 24), heights taken as given and folder order (decision 12),
+  warnings for what the content policy will block, and `publish` creating projects (decision 6). The MCP
+  request limit was raised to a full publish: the SDK's own default of 4 MiB refused larger ones. A relative
+  `data_dir` made every publish fail, as git read the temporary index's path from inside the project's
+  folder; the path is made absolute now.
 
 **What is checked:**
 
 - unit and integration tests in every package (`go test ./...`, also under `-race`), including concurrent
   publishes, conflicts, moves, path safety, roles, invitations, restore, threads following moves, the MCP
   server through the SDK's own client, git clone and push with the real git client, every page of the web
-  app, and the static files' compression and caching;
+  app, and the static files' compression and caching; upload addresses (signatures, expiry, revoked tokens,
+  roles, limits, tars) and publishing by upload id; and screenshots in a real Chromium, which the tests skip
+  when none is installed;
 - an end-to-end run in headless Chromium against a local server: sign-in, an agent's publish, a comment
   placed by clicking an element, the agent reading it, changing the artifact and resolving the thread, the
   open page reloading by itself, links between artifacts, the canvas, history and compare, the app being
@@ -800,7 +942,9 @@ project. It found eight smaller problems, all fixed and covered by tests:
 | `internal/store` | SQLite: accounts, sessions, tokens, projects, members, invitations, threads |
 | `internal/service` | The rules: roles, paths, publishing and conflicts, restore, members, threads, accounts, tokens |
 | `internal/content` | Signed content addresses, the sandbox CSP, the bridge injection |
-| `internal/mcpserver` | The MCP tools and the agents' instructions |
+| `internal/mcpserver` | The MCP tools and the agents' instructions; `screenshot.go` is the screenshot tool |
+| `internal/upload` | Upload addresses: signing, and storing what is sent to them (decision 23) |
+| `internal/render` | The screenshot browser: Chromium over a pipe, the requests it is answered with, the renderer container's server and its client (decision 24) |
 | `internal/githttp` | Git over HTTPS through `git http-backend` |
 | `internal/events` | Live updates to open pages |
 | `internal/web` | Sign-in, the pages, their JSON API, `static/app.js` (the pages) and `static/bridge.js` (inside artifacts). `static/app.css` holds the slate theme and Artifex's own styles; `static/vendor/tabler/` and `icons/` are Tabler and its icons, copied unchanged (decision 22) |

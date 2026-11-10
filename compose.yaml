@@ -13,8 +13,34 @@ services:
     environment:
       ARTIFEX_GOOGLE_CLIENT_SECRET: ${ARTIFEX_GOOGLE_CLIENT_SECRET:-}
       ARTIFEX_SIGNING_KEY: ${ARTIFEX_SIGNING_KEY:-}
-    logging:
+    networks: [default, render]
+    logging: &logging
       driver: json-file
       options:
         max-size: 50m
         max-file: "3"
+
+  # The browser for the screenshot tool (design decision 24). config.yaml
+  # turns the tool on with screenshots.renderer: http://renderer:8091. To run
+  # without screenshots, leave that out and remove this service.
+  renderer:
+    build:
+      context: .
+      target: renderer
+    image: artifex-renderer:local
+    restart: unless-stopped
+    command: ["renderer", "-no-sandbox", "-upstream", "http://artifex:8090"]
+    networks: [render] # no internet, no volumes, no secrets
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+    mem_limit: 1g
+    pids_limit: 512
+    logging: *logging
+
+networks:
+  render:
+    internal: true # Artifex and the renderer reach each other; the renderer reaches nothing else

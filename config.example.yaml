@@ -44,5 +44,14 @@ limits:
   max_file_bytes: 26214400      # 25 MB per file
   max_publish_bytes: 52428800   # 50 MB per publish
   content_url_ttl: 2h           # how long an artifact address stays valid
+  upload_url_ttl: 15m           # how long an upload address (create_upload) takes files
   session_ttl: 720h             # 30 days
-  requests_per_minute: 300      # per client address, on sign-in, MCP and git
+  requests_per_minute: 300      # per client address, on sign-in, MCP, uploads and git
+
+# The screenshot tool. Empty: no tool. The renderer container's address, as in
+# compose.yaml; or "local" for a Chromium on this host (development only: it
+# runs published pages next to the data). Example:
+#   renderer: http://renderer:8091
+screenshots:
+  renderer: ""
+  chromium: ""                  # for "local": the browser; empty finds it on PATH

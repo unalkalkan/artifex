@@ -37,19 +37,25 @@ type ProjectMeta struct {
 	Title       string `yaml:"title"`
 	Description string `yaml:"description"`
 	Open        string `yaml:"open"`
+	// Order orders the project's top folder, as folder.yaml's order does
+	// for its folder. It is used over a top-level folder.yaml's.
+	Order []string `yaml:"order"`
 }
 
 // FolderMeta is folder.yaml (design decision 12). Every field is optional.
 type FolderMeta struct {
-	Title string   `yaml:"title"`
-	Label string   `yaml:"label"`
+	Title string `yaml:"title"`
+	Label string `yaml:"label"`
+	// Order names the folder's artifacts and folders, in the order they are
+	// shown. The rest follow by name.
 	Order []string `yaml:"order"`
 }
 
 // ArtifactMeta is what an artifact says about itself.
 type ArtifactMeta struct {
-	Title string
-	Width int // 0: fills the window
+	Title  string
+	Width  int // 0: fills the window
+	Height int // 0: the frame follows the content
 }
 
 // CreateProject creates a project with a git repository; the actor becomes
@@ -263,11 +269,12 @@ type Folder struct {
 
 // Artifact is one HTML file in a folder.
 type Artifact struct {
-	Path  string
-	Name  string
-	Blob  string
-	Title string
-	Width int
+	Path   string
+	Name   string
+	Blob   string
+	Title  string
+	Width  int
+	Height int
 }
 
 // FolderAt reads a folder for display. Callers check permissions.
@@ -295,28 +302,47 @@ func (s *Service) FolderAt(ctx context.Context, project, commit, dir string) (Fo
 			f.Files = append(f.Files, FileInfo{Path: it.Path, Type: "file", Blob: it.ID, Size: it.Size})
 		case IsHTML(it.Path):
 			m := s.ArtifactMetaOf(ctx, project, it.ID, it.Name)
-			f.Artifacts = append(f.Artifacts, Artifact{Path: it.Path, Name: it.Name, Blob: it.ID, Title: m.Title, Width: m.Width})
+			f.Artifacts = append(f.Artifacts, Artifact{Path: it.Path, Name: it.Name, Blob: it.ID, Title: m.Title, Width: m.Width, Height: m.Height})
 		default:
 			f.Files = append(f.Files, FileInfo{Path: it.Path, Type: "file", Blob: it.ID, Size: it.Size})
 		}
 	}
-	orderArtifacts(f.Artifacts, f.Meta.Order)
+	order := f.Meta.Order
+	if dir == "" {
+		if m := s.projectMeta(ctx, repo, commit); len(m.Order) > 0 {
+			order = m.Order
+		}
+	}
+	rank := orderRank(order)
+	sortByRank(f.Artifacts, rank, func(a Artifact) string { return a.Name })
+	sortByRank(f.Folders, rank, func(fi FileInfo) string { return path.Base(fi.Path) })
 	return f, nil
 }
 
-// orderArtifacts puts the ones folder.yaml lists first, in its order, then
-// the rest by name. A listed name may omit ".html".
-func orderArtifacts(as []Artifact, order []string) {
+// orderRank ranks the names an order lists: artifacts, with or without
+// ".html", and folders, with or without a trailing "/".
+func orderRank(order []string) map[string]int {
 	rank := map[string]int{}
 	for i, o := range order {
-		o = strings.TrimSpace(o)
-		rank[o] = i + 1
+		o = strings.TrimSuffix(strings.TrimSpace(o), "/")
+		if _, ok := rank[o]; !ok {
+			rank[o] = i + 1
+		}
 		if !IsHTML(o) {
-			rank[o+".html"] = i + 1
+			if _, ok := rank[o+".html"]; !ok {
+				rank[o+".html"] = i + 1
+			}
 		}
 	}
-	sort.SliceStable(as, func(i, j int) bool {
-		ri, rj := rank[as[i].Name], rank[as[j].Name]
+	return rank
+}
+
+// sortByRank puts the listed entries first, in the order's order, then the
+// rest by name.
+func sortByRank[T any](items []T, rank map[string]int, name func(T) string) {
+	sort.SliceStable(items, func(i, j int) bool {
+		ni, nj := name(items[i]), name(items[j])
+		ri, rj := rank[ni], rank[nj]
 		switch {
 		case ri > 0 && rj > 0:
 			return ri < rj
@@ -325,18 +351,19 @@ func orderArtifacts(as []Artifact, order []string) {
 		case rj > 0:
 			return false
 		}
-		return as[i].Name < as[j].Name
+		return ni < nj
 	})
 }
 
 var (
-	titlePattern = regexp.MustCompile(`(?is)<title[^>]*>(.*?)</title>`)
-	metaPattern  = regexp.MustCompile(`(?is)<meta\b[^>]*>`)
-	attrPattern  = regexp.MustCompile(`(?is)([a-z-]+)\s*=\s*("([^"]*)"|'([^']*)'|([^\s>]+))`)
-	widthPattern = regexp.MustCompile(`(?i)width\s*=\s*(\d+)`)
+	titlePattern  = regexp.MustCompile(`(?is)<title[^>]*>(.*?)</title>`)
+	metaPattern   = regexp.MustCompile(`(?is)<meta\b[^>]*>`)
+	attrPattern   = regexp.MustCompile(`(?is)([a-z-]+)\s*=\s*("([^"]*)"|'([^']*)'|([^\s>]+))`)
+	widthPattern  = regexp.MustCompile(`(?i)\bwidth\s*=\s*(\d+)`)
+	heightPattern = regexp.MustCompile(`(?i)\bheight\s*=\s*(\d+)`)
 )
 
-// ArtifactMetaOf reads an artifact's title and width (design decision 12).
+// ArtifactMetaOf reads an artifact's title and size (design decision 12).
 func (s *Service) ArtifactMetaOf(ctx context.Context, project, blob, name string) ArtifactMeta {
 	if v, ok := s.cached("a:" + blob); ok {
 		m := v.(ArtifactMeta)
@@ -356,8 +383,9 @@ func (s *Service) ArtifactMetaOf(ctx context.Context, project, blob, name string
 	return m
 }
 
-// ParseArtifactMeta reads <title> and <meta name="artifact" content="width=N">
-// from the start of an HTML document.
+// ParseArtifactMeta reads <title> and
+// <meta name="artifact" content="width=N, height=N"> from the start of an
+// HTML document.
 func ParseArtifactMeta(data []byte) ArtifactMeta {
 	if len(data) > 256<<10 {
 		data = data[:256<<10]
@@ -374,14 +402,25 @@ func ParseArtifactMeta(data []byte) ArtifactMeta {
 		}
 		if strings.EqualFold(attrs["name"], "artifact") {
 			if w := widthPattern.FindStringSubmatch(attrs["content"]); w != nil {
-				if n, err := strconv.Atoi(w[1]); err == nil && n >= 200 && n <= 8000 {
+				if n, err := strconv.Atoi(w[1]); err == nil && n >= MinWidth && n <= MaxWidth {
 					m.Width = n
+				}
+			}
+			if h := heightPattern.FindStringSubmatch(attrs["content"]); h != nil {
+				if n, err := strconv.Atoi(h[1]); err == nil && n >= MinHeight && n <= MaxHeight {
+					m.Height = n
 				}
 			}
 		}
 	}
 	return m
 }
+
+// The sizes an artifact may give itself, in pixels.
+const (
+	MinWidth, MaxWidth   = 200, 8000
+	MinHeight, MaxHeight = 100, 16000
+)
 
 // Parent returns the folder of a path ("" for the root).
 func Parent(p string) string {

@@ -74,7 +74,7 @@ func TestMCPEndToEnd(t *testing.T) {
 	ctx := context.Background()
 	acct, _ := svc.AddAccount(ctx, "dev@x.test", "Dev", false)
 	tok, _ := svc.CreateToken(ctx, acct, "Claude")
-	srv := httptest.NewServer(Handler(svc, zap.NewNop()))
+	srv := httptest.NewServer(Handler(svc, zap.NewNop(), Options{}))
 	defer srv.Close()
 
 	// No token: refused.
@@ -174,7 +174,7 @@ func TestMCPLargePublish(t *testing.T) {
 	ctx := context.Background()
 	acct, _ := svc.AddAccount(ctx, "dev@x.test", "Dev", false)
 	tok, _ := svc.CreateToken(ctx, acct, "Claude")
-	srv := httptest.NewServer(Handler(svc, zap.NewNop()))
+	srv := httptest.NewServer(Handler(svc, zap.NewNop(), Options{}))
 	defer srv.Close()
 	s := connect(t, srv.URL, tok.Secret)
 	if _, isErr, text := call(t, s, "create_project", map[string]any{"project": "big"}); isErr {

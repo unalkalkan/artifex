@@ -5,6 +5,7 @@
 //	artifex admin account list
 //	artifex admin token create <email> [-label L]
 //	artifex admin backup <dir>                  copy the database and bundle every project
+//	artifex renderer [-listen A] [-upstream U]  the screenshot browser, in a container of its own
 //	artifex healthcheck                         exit 0 when the local server answers
 //
 // Every command reads the configuration from -config, $ARTIFEX_CONFIG, or
@@ -33,8 +34,10 @@ import (
 	"github.com/unalkalkan/artifex/internal/githttp"
 	"github.com/unalkalkan/artifex/internal/gitrepo"
 	"github.com/unalkalkan/artifex/internal/mcpserver"
+	"github.com/unalkalkan/artifex/internal/render"
 	"github.com/unalkalkan/artifex/internal/service"
 	"github.com/unalkalkan/artifex/internal/store"
+	"github.com/unalkalkan/artifex/internal/upload"
 	"github.com/unalkalkan/artifex/internal/web"
 )
 
@@ -49,7 +52,11 @@ Usage:
   artifex admin account list [-config FILE]
   artifex admin token create <email> [-label LABEL] [-config FILE]
   artifex admin backup <dir> [-config FILE]
-  artifex healthcheck [-config FILE]       exit 0 when the server answers
+  artifex renderer [-listen ADDR] [-upstream URL] [-chromium PATH] [-no-sandbox]
+                                           draw artifacts for the screenshot tool, in a
+                                           container of its own (docs/design.md, decision 24)
+  artifex healthcheck [-config FILE] [-url URL]
+                                           exit 0 when the server (or URL) answers
   artifex version
 `)
 	os.Exit(2)
@@ -69,6 +76,8 @@ func main() {
 		fmt.Println(version)
 	case "healthcheck":
 		err = healthcheck(os.Args[2:])
+	case "renderer":
+		err = renderer(os.Args[2:])
 	default:
 		usage()
 	}
@@ -175,9 +184,18 @@ func serve(args []string) error {
 	if err != nil {
 		return err
 	}
+	uploads := upload.New(a.svc, key, log)
+	// app is the whole server; a local renderer fetches content through it.
+	var app http.Handler
+	draw, err := screenshotRenderer(a.cfg, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { app.ServeHTTP(w, r) }), log)
+	if err != nil {
+		return err
+	}
+	mcp := mcpserver.Handler(a.svc, log, mcpserver.Options{Uploads: uploads, Renderer: draw, ContentURL: ws.Content().URL})
+	app = ws.Handler(web.Options{MCP: mcp, Git: gh, Uploads: uploads})
 	srv := &http.Server{
 		Addr:              a.cfg.Listen,
-		Handler:           ws.Handler(web.Options{MCP: mcpserver.Handler(a.svc, log), Git: gh}),
+		Handler:           app,
 		ReadHeaderTimeout: 15 * time.Second,
 		IdleTimeout:       120 * time.Second,
 		MaxHeaderBytes:    64 << 10,
@@ -213,6 +231,76 @@ func serve(args []string) error {
 	sctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 	return srv.Shutdown(sctx)
+}
+
+// screenshotRenderer is the renderer screenshots.renderer names, or nil.
+func screenshotRenderer(cfg *config.Config, self http.Handler, log *zap.Logger) (render.Renderer, error) {
+	switch r := cfg.Screenshots.Renderer; r {
+	case "":
+		return nil, nil
+	case "local":
+		path := cfg.Screenshots.Chromium
+		if path == "" {
+			path = render.FindChromium()
+		}
+		if path == "" {
+			return nil, errors.New("screenshots.renderer is local, but no Chromium was found; install it or set screenshots.chromium")
+		}
+		log.Warn("screenshots are drawn by a Chromium on this host, next to the data; use a renderer container in production (docs/design.md, decision 24)", zap.String("chromium", path))
+		return &render.Browser{Path: path, Upstream: self}, nil
+	default:
+		log.Info("screenshots are drawn by a renderer", zap.String("renderer", r))
+		return &render.Remote{URL: r}, nil
+	}
+}
+
+// renderer serves the screenshot browser (design decision 24): it draws
+// what Artifex asks, fetching content from Artifex at -upstream. It needs no
+// configuration file and holds no data.
+func renderer(args []string) error {
+	fs := flag.NewFlagSet("renderer", flag.ExitOnError)
+	listen := fs.String("listen", envOr("ARTIFEX_RENDERER_LISTEN", "0.0.0.0:8091"), "address to serve on")
+	upstream := fs.String("upstream", envOr("ARTIFEX_RENDERER_UPSTREAM", "http://artifex:8090"), "Artifex's address on the renderer's network")
+	chromium := fs.String("chromium", os.Getenv("ARTIFEX_CHROMIUM"), "Chromium binary; empty: found on PATH")
+	noSandbox := fs.Bool("no-sandbox", false, "turn off Chromium's own sandbox: only in a container, which is the sandbox then")
+	fs.Parse(args)
+	log := newLogger()
+	defer log.Sync()
+	path := *chromium
+	if path == "" {
+		path = render.FindChromium()
+	}
+	if path == "" {
+		return errors.New("no Chromium found; install it or pass -chromium")
+	}
+	up, err := render.Proxy(*upstream)
+	if err != nil {
+		return err
+	}
+	b := &render.Browser{Path: path, NoSandbox: *noSandbox, Upstream: up}
+	srv := &http.Server{Addr: *listen, Handler: render.Handler(b, log), ReadHeaderTimeout: 15 * time.Second}
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+	errc := make(chan error, 1)
+	go func() {
+		log.Info("renderer listening", zap.String("addr", *listen), zap.String("upstream", *upstream), zap.String("chromium", path), zap.String("version", version))
+		errc <- srv.ListenAndServe()
+	}()
+	select {
+	case err := <-errc:
+		return err
+	case <-ctx.Done():
+	}
+	sctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+	return srv.Shutdown(sctx)
+}
+
+func envOr(key, def string) string {
+	if v := os.Getenv(key); v != "" {
+		return v
+	}
+	return def
 }
 
 // syncWorktrees makes every project's working tree equal to its branch, in
@@ -364,20 +452,25 @@ func backup(ctx context.Context, a *app, dir string) error {
 // HEALTHCHECK.
 func healthcheck(args []string) error {
 	fs := flag.NewFlagSet("healthcheck", flag.ExitOnError)
+	direct := fs.String("url", "", "ask this address instead, such as the renderer's http://127.0.0.1:8091/healthz")
 	path, _, err := configPath(fs, args)
 	if err != nil {
 		return err
 	}
-	cfg, err := config.Load(path)
-	if err != nil {
-		return err
-	}
-	addr := cfg.Listen
-	if strings.HasPrefix(addr, "0.0.0.0:") || strings.HasPrefix(addr, ":") {
-		addr = "127.0.0.1:" + addr[strings.LastIndexByte(addr, ':')+1:]
+	target := *direct
+	if target == "" {
+		cfg, err := config.Load(path)
+		if err != nil {
+			return err
+		}
+		addr := cfg.Listen
+		if strings.HasPrefix(addr, "0.0.0.0:") || strings.HasPrefix(addr, ":") {
+			addr = "127.0.0.1:" + addr[strings.LastIndexByte(addr, ':')+1:]
+		}
+		target = "http://" + addr + "/healthz"
 	}
 	c := &http.Client{Timeout: 3 * time.Second}
-	resp, err := c.Get("http://" + addr + "/healthz")
+	resp, err := c.Get(target)
 	if err != nil {
 		return err
 	}

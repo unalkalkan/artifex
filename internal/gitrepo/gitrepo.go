@@ -177,6 +177,48 @@ func (r *Repo) StreamBlob(ctx context.Context, id string, w io.Writer) error {
 	return cmd.Run()
 }
 
+// WriteBlob stores src's content as a blob, streamed, and returns its id.
+// Nothing refers to the blob until a commit does; git removes unreferenced
+// objects only once they are two weeks old.
+func (r *Repo) WriteBlob(ctx context.Context, src io.Reader) (string, error) {
+	cmd := exec.CommandContext(ctx, "git", "hash-object", "-w", "--stdin")
+	cmd.Dir = r.Dir
+	cmd.Env = Env()
+	cmd.Stdin = src
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+	if err := cmd.Run(); err != nil {
+		var ee *exec.ExitError
+		if errors.As(err, &ee) {
+			return "", &exitError{code: ee.ExitCode(), stderr: stderr.String(), args: []string{"hash-object", "-w", "--stdin"}}
+		}
+		return "", err // src's own error too, such as a size limit
+	}
+	return strings.TrimSpace(stdout.String()), nil
+}
+
+// ObjectInfo returns an object's type ("blob", "tree", "commit") and size,
+// or ErrNotFound when the repository doesn't have it.
+func (r *Repo) ObjectInfo(ctx context.Context, id string) (string, int64, error) {
+	if !isHex(id) {
+		return "", 0, ErrNotFound
+	}
+	out, err := r.runInput(ctx, nil, []byte(id+"\n"), "cat-file", "--batch-check")
+	if err != nil {
+		return "", 0, err
+	}
+	f := strings.Fields(string(out))
+	if len(f) != 3 || f[0] != id {
+		return "", 0, ErrNotFound // "<id> missing"
+	}
+	size, err := strconv.ParseInt(f[2], 10, 64)
+	if err != nil {
+		return "", 0, err
+	}
+	return f[1], size, nil
+}
+
 // ReadFile returns the blob at path in commit.
 func (r *Repo) ReadFile(ctx context.Context, commit, path string) (Entry, []byte, error) {
 	e, err := r.Lookup(ctx, commit, path)

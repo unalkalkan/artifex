@@ -39,7 +39,8 @@ type Config struct {
 	// password. For local development only.
 	DevAuth bool `yaml:"dev_auth"`
 
-	Limits Limits `yaml:"limits"`
+	Limits      Limits      `yaml:"limits"`
+	Screenshots Screenshots `yaml:"screenshots"`
 }
 
 type Google struct {
@@ -55,10 +56,23 @@ type Limits struct {
 	MaxFileBytes    int64         `yaml:"max_file_bytes"`
 	MaxPublishBytes int64         `yaml:"max_publish_bytes"`
 	ContentURLTTL   time.Duration `yaml:"content_url_ttl"`
-	SessionTTL      time.Duration `yaml:"session_ttl"`
+	// UploadURLTTL is how long an upload address (create_upload) takes files.
+	UploadURLTTL time.Duration `yaml:"upload_url_ttl"`
+	SessionTTL   time.Duration `yaml:"session_ttl"`
 	// RequestsPerMinute is the rate limit per client address on sign-in,
-	// MCP and git.
+	// MCP, uploads and git.
 	RequestsPerMinute int `yaml:"requests_per_minute"`
+}
+
+// Screenshots configures the screenshot tool (design decision 24).
+type Screenshots struct {
+	// Renderer draws artifacts: empty (no screenshot tool), the address of
+	// an `artifex renderer` container, such as http://renderer:8091, or
+	// "local" for a Chromium on this host (development only: it renders
+	// published scripts next to the data).
+	Renderer string `yaml:"renderer"`
+	// Chromium is the browser for renderer "local". Empty: found on PATH.
+	Chromium string `yaml:"chromium"`
 }
 
 // Load reads path, applies defaults and the environment, and validates.
@@ -100,6 +114,11 @@ func (c *Config) applyDefaults() {
 	if c.DataDir == "" {
 		c.DataDir = "./data"
 	}
+	// git runs inside each project's folder, so a relative path, which it
+	// would read from there, would point nowhere.
+	if abs, err := filepath.Abs(c.DataDir); err == nil {
+		c.DataDir = abs
+	}
 	if c.Limits.MaxFileBytes == 0 {
 		c.Limits.MaxFileBytes = 25 << 20
 	}
@@ -108,6 +127,9 @@ func (c *Config) applyDefaults() {
 	}
 	if c.Limits.ContentURLTTL == 0 {
 		c.Limits.ContentURLTTL = 2 * time.Hour
+	}
+	if c.Limits.UploadURLTTL == 0 {
+		c.Limits.UploadURLTTL = 15 * time.Minute
 	}
 	if c.Limits.SessionTTL == 0 {
 		c.Limits.SessionTTL = 30 * 24 * time.Hour
@@ -135,6 +157,11 @@ func (c *Config) validate() error {
 	}
 	if c.Limits.MaxPublishBytes < c.Limits.MaxFileBytes {
 		return errors.New("limits.max_publish_bytes must be at least limits.max_file_bytes")
+	}
+	if r := c.Screenshots.Renderer; r != "" && r != "local" {
+		if u, err := url.Parse(r); err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
+			return fmt.Errorf("screenshots.renderer must be empty, \"local\" or the renderer's http address, got %q", r)
+		}
 	}
 	return nil
 }

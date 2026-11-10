@@ -165,7 +165,7 @@ func (s *Server) viewPage(w http.ResponseWriter, r *http.Request, a service.Acto
 		"P": pc, "Path": p, "Meta": meta, "Folder": folder, "Prev": prev, "Next": next,
 		"Frame": map[string]any{
 			"project": project, "path": p, "version": pc.Version, "latest": pc.IsLatest, "url": s.content.URL(project, pc.Version, p),
-			"width": meta.Width, "title": meta.Title, "canComment": true, "label": folder.Meta.Label,
+			"width": meta.Width, "height": meta.Height, "title": meta.Title, "canComment": true, "label": folder.Meta.Label,
 		},
 	}})
 }
@@ -179,12 +179,12 @@ func (s *Server) canvasPage(w http.ResponseWriter, r *http.Request, a service.Ac
 	counts := s.openCounts(r, a, pc.Project.ID)
 	type frame struct {
 		Path, Title, URL string
-		Width            int
+		Width, Height    int
 		Open             int
 	}
 	var frames []frame
 	for _, art := range f.Artifacts {
-		frames = append(frames, frame{Path: art.Path, Title: art.Title, URL: s.content.URL(pc.Project.ID, pc.Version, art.Path), Width: art.Width, Open: counts[art.Path]})
+		frames = append(frames, frame{Path: art.Path, Title: art.Title, URL: s.content.URL(pc.Project.ID, pc.Version, art.Path), Width: art.Width, Height: art.Height, Open: counts[art.Path]})
 	}
 	title := f.Meta.Title
 	if title == "" {
@@ -268,11 +268,11 @@ func (s *Server) comparePage(w http.ResponseWriter, r *http.Request, a service.A
 				oldPath = s.svc.PathBefore(ctx, project, from, to, p)
 			}
 		}
-		var width int
+		var meta service.ArtifactMeta
 		if e, err := s.svc.Entry(ctx, project, to, p); err == nil {
-			width = s.svc.ArtifactMetaOf(ctx, project, e.ID, path.Base(p)).Width
+			meta = s.svc.ArtifactMetaOf(ctx, project, e.ID, path.Base(p))
 		}
-		data["Frames"] = map[string]any{"width": width}
+		data["Frames"] = map[string]any{"width": meta.Width, "height": meta.Height}
 		if oldPath != "" && from != "" {
 			data["FromURL"] = s.content.URL(project, from, oldPath)
 		}

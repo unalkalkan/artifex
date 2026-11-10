@@ -12,7 +12,7 @@
     to <code>{{short .To}}</code>{{with .ToV}} “{{.Message}}” by {{.Author}}, <time datetime="{{iso .When}}"></time>{{end}}.
   </p>
   {{if .ToURL}}
-  <div class="compare" id="compare" data-width="{{.Frames.width}}">
+  <div class="compare" id="compare" data-width="{{.Frames.width}}" data-height="{{.Frames.height}}">
     <figure class="card">
       <figcaption class="card-header"><h3 class="card-title">Before{{if .From}} <code class="ms-2">{{short .From}}</code>{{end}}</h3></figcaption>
       <div class="board-box">{{if .FromURL}}<iframe title="Before" sandbox="{{sandbox}}" src="{{.FromURL}}"></iframe>{{else}}<p class="text-secondary p-4 m-0">The artifact didn't exist yet.</p>{{end}}</div>

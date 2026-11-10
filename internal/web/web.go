@@ -58,8 +58,9 @@ type Server struct {
 
 // Options wires the handlers that live in other packages.
 type Options struct {
-	MCP http.Handler
-	Git http.Handler
+	MCP     http.Handler
+	Git     http.Handler
+	Uploads http.Handler // upload addresses (design decision 23)
 }
 
 func New(svc *service.Service, key []byte, log *zap.Logger) (*Server, error) {
@@ -129,6 +130,9 @@ func (s *Server) Handler(o Options) http.Handler {
 	}
 	if o.Git != nil {
 		mux.Handle("/git/", s.limiter.wrap(o.Git))
+	}
+	if o.Uploads != nil {
+		mux.Handle("/u/", s.limiter.wrap(o.Uploads))
 	}
 
 	// Sign-in.
