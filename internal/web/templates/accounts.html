@@ -1,0 +1,78 @@
+{{define "content"}}{{with .Data}}{{$me := .Me}}
+<div class="page-header d-print-none">
+  <h2 class="page-title">Accounts</h2>
+  <div class="text-secondary mt-1">Only Admins see this page. No one can change their own account here.</div>
+</div>
+{{if .Pending}}
+<div class="card mb-4">
+  <div class="card-status-top bg-yellow"></div>
+  <div class="card-header"><h3 class="card-title">Waiting for verification</h3><div class="card-actions"><span class="badge bg-yellow-lt">{{len .Pending}}</span></div></div>
+  <div class="list-group list-group-flush">
+    {{range .Pending}}
+    <div class="list-group-item">
+      <div class="d-flex flex-wrap align-items-center gap-3">
+        <span class="avatar avatar-sm">{{initials .DisplayName .Email}}</span>
+        <div class="me-auto min-w-0"><div class="fw-medium text-truncate">{{.DisplayName}}</div><div class="text-secondary small text-truncate">{{.Email}} · signed up <time datetime="{{iso .CreatedAt}}"></time></div></div>
+        <div class="btn-list">
+          {{template "acct-action" (dict "ID" .ID "Action" "verify" "Label" "Verify" "Icon" "user-check" "CSRF" $.CSRF "Class" "btn-primary")}}
+          {{template "acct-action" (dict "ID" .ID "Action" "remove" "Label" "Remove" "Icon" "trash" "CSRF" $.CSRF "Class" "btn-ghost-danger" "Title" "Remove this account?" "Confirm" "They can sign up again later.")}}
+        </div>
+      </div>
+    </div>
+    {{end}}
+  </div>
+</div>
+{{end}}
+<div class="card mb-4">
+  <div class="card-header"><h3 class="card-title">Active</h3></div>
+  <div class="list-group list-group-flush">
+    {{range .Active}}
+    <div class="list-group-item">
+      <div class="d-flex flex-wrap align-items-center gap-3">
+        <span class="avatar avatar-sm">{{initials .DisplayName .Email}}</span>
+        <div class="me-auto min-w-0">
+          <div class="fw-medium text-truncate">{{.DisplayName}}{{if .IsAdmin}} <span class="badge bg-purple-lt ms-1">Admin</span>{{end}}{{if eq .ID $me}} <span class="badge bg-secondary-lt ms-1">You</span>{{end}}</div>
+          <div class="text-secondary small text-truncate">{{.Email}}{{with .LastSeenAt}} · last seen <time datetime="{{iso .}}"></time>{{end}}</div>
+        </div>
+        {{if ne .ID $me}}
+        <div class="btn-list">
+          {{if .IsAdmin}}{{template "acct-action" (dict "ID" .ID "Action" "make-member" "Label" "Make Member" "CSRF" $.CSRF "Class" "")}}
+          {{else}}{{template "acct-action" (dict "ID" .ID "Action" "make-admin" "Label" "Make Admin" "Icon" "shield" "CSRF" $.CSRF "Class" "" "Title" "Make this person an Admin?" "Confirm" "Admins manage every account and project." "Variant" "primary")}}{{end}}
+          {{template "acct-action" (dict "ID" .ID "Action" "disable" "Label" "Disable" "Icon" "user-x" "CSRF" $.CSRF "Class" "btn-ghost-warning" "Title" "Disable this account?" "Confirm" "Its sessions end and its tokens stop working. You can enable it again.")}}
+          {{template "acct-action" (dict "ID" .ID "Action" "remove" "Label" "Remove" "Icon" "trash" "CSRF" $.CSRF "Class" "btn-ghost-danger" "Title" "Remove this account?" "Confirm" "Its tokens and memberships go too. To keep someone out, disable them instead: a removed person who signs in again comes back as a new account.")}}
+        </div>
+        {{end}}
+      </div>
+    </div>
+    {{end}}
+  </div>
+</div>
+{{if .Disabled}}
+<div class="card">
+  <div class="card-header"><h3 class="card-title">Disabled</h3></div>
+  <div class="list-group list-group-flush">
+    {{range .Disabled}}
+    <div class="list-group-item">
+      <div class="d-flex flex-wrap align-items-center gap-3">
+        <span class="avatar avatar-sm">{{initials .DisplayName .Email}}</span>
+        <div class="me-auto min-w-0"><div class="fw-medium text-truncate text-secondary">{{.DisplayName}}</div><div class="text-secondary small text-truncate">{{.Email}}</div></div>
+        <div class="btn-list">
+          {{template "acct-action" (dict "ID" .ID "Action" "enable" "Label" "Enable" "Icon" "user-check" "CSRF" $.CSRF "Class" "")}}
+          {{template "acct-action" (dict "ID" .ID "Action" "remove" "Label" "Remove" "Icon" "trash" "CSRF" $.CSRF "Class" "btn-ghost-danger" "Title" "Remove this account?" "Confirm" "Its tokens and memberships go too.")}}
+        </div>
+      </div>
+    </div>
+    {{end}}
+  </div>
+</div>
+{{end}}
+{{end}}{{end}}
+
+{{/* One account action. Call with (dict "ID" id "Action" a "Label" l "CSRF" c "Class" btn-class
+     and optionally "Icon", and "Title" "Confirm" "Variant" to ask first). */}}
+{{define "acct-action"}}
+<form method="post" class="m-0"{{with .Confirm}} data-confirm="{{.}}"{{end}}{{with .Title}} data-confirm-title="{{.}}"{{end}}{{if .Confirm}} data-confirm-cta="{{.Label}}"{{end}}{{with .Variant}} data-confirm-variant="{{.}}"{{end}}>
+  <input type="hidden" name="csrf" value="{{.CSRF}}"><input type="hidden" name="id" value="{{.ID}}"><input type="hidden" name="action" value="{{.Action}}">
+  <button class="btn btn-sm {{.Class}}">{{with .Icon}}{{icon .}}{{end}}{{.Label}}</button>
+</form>
+{{end}}

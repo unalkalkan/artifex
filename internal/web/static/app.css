@@ -1,0 +1,267 @@
+/* Artifex pages, on Tabler 1.0.0-beta20 (vendor/tabler), in a dark slate
+ * theme (design decision 22). Everything after the theme is Artifex's own and
+ * uses Tabler's variables, never fixed colours. */
+
+/* ---------- dark slate (.theme-slate) ----------
+ * Tabler beta20 has no slate base of its own. This block defines one: the
+ * slate scale for Tabler's greys, and the dark surfaces built on it. */
+.theme-slate {
+  --tblr-gray-50: #f8fafc;
+  --tblr-gray-100: #f1f5f9;
+  --tblr-gray-200: #e2e8f0;
+  --tblr-gray-300: #cbd5e1;
+  --tblr-gray-400: #94a3b8;
+  --tblr-gray-500: #64748b;
+  --tblr-gray-600: #475569;
+  --tblr-gray-700: #334155;
+  --tblr-gray-800: #1e293b;
+  --tblr-gray-900: #0f172a;
+  --tblr-gray-950: #020617;
+  --tblr-gray-50-rgb: 248, 250, 252;
+  --tblr-gray-100-rgb: 241, 245, 249;
+  --tblr-gray-200-rgb: 226, 232, 240;
+  --tblr-gray-300-rgb: 203, 213, 225;
+  --tblr-gray-400-rgb: 148, 163, 184;
+  --tblr-gray-500-rgb: 100, 116, 139;
+  --tblr-gray-600-rgb: 71, 85, 105;
+  --tblr-gray-700-rgb: 51, 65, 85;
+  --tblr-gray-800-rgb: 30, 41, 59;
+  --tblr-gray-900-rgb: 15, 23, 42;
+  --tblr-gray-950-rgb: 2, 6, 23;
+  --tblr-white: #ffffff;
+  --tblr-black: #000000;
+  --tblr-light: var(--tblr-gray-50);
+  --tblr-light-rgb: 248, 250, 252;
+  --tblr-dark: var(--tblr-gray-800);
+  --tblr-dark-rgb: 30, 41, 59;
+  --tblr-gray: var(--tblr-gray-600);
+  --tblr-gray-dark: var(--tblr-gray-800);
+  --tblr-secondary: var(--tblr-gray-500);
+  --tblr-secondary-rgb: 100, 116, 139;
+  --tblr-tertiary: var(--tblr-gray-400);
+  --tblr-muted: var(--tblr-gray-400);
+  --tblr-muted-rgb: 148, 163, 184;
+  --tblr-dark-mode-border-color: #2c3c56;
+  --tblr-dark-mode-border-color-translucent: rgba(128, 150, 172, 0.2);
+  --tblr-dark-mode-border-dark-color: #253249;
+  --tblr-dark-mode-border-active-color: #334564;
+  --tblr-card-bg: var(--tblr-bg-surface);
+  --tblr-card-color: var(--tblr-body-color);
+}
+
+.theme-slate[data-bs-theme="dark"] {
+  color-scheme: dark;
+  color: var(--tblr-body-color);
+  --tblr-body-color: var(--tblr-gray-200);
+  --tblr-body-color-rgb: 226, 232, 240;
+  --tblr-secondary: var(--tblr-gray-400);
+  --tblr-body-bg: var(--tblr-gray-900);
+  --tblr-body-bg-rgb: 15, 23, 42;
+  --tblr-emphasis-color: #ffffff;
+  --tblr-emphasis-color-rgb: 255, 255, 255;
+  --tblr-bg-forms: var(--tblr-gray-900);
+  --tblr-bg-surface: var(--tblr-gray-800);
+  --tblr-bg-surface-inverted: var(--tblr-gray-100);
+  --tblr-bg-surface-secondary: var(--tblr-gray-900);
+  --tblr-bg-surface-tertiary: var(--tblr-gray-800);
+  --tblr-text-inverted: var(--tblr-gray-800);
+  --tblr-link-color: var(--tblr-primary);
+  --tblr-link-hover-color: color-mix(in srgb, var(--tblr-primary), black 20%);
+  --tblr-active-bg: #212e42;
+  --tblr-disabled-color: color-mix(in srgb, var(--tblr-body-color) 40%, transparent);
+  --tblr-border-color: var(--tblr-gray-700);
+  --tblr-border-color-translucent: var(--tblr-dark-mode-border-color-translucent);
+  --tblr-border-dark-color: var(--tblr-dark-mode-border-dark-color);
+  --tblr-border-active-color: var(--tblr-dark-mode-border-active-color);
+  --tblr-btn-color: #1b2434;
+  --tblr-secondary-color: rgba(226, 232, 240, 0.75);
+  --tblr-secondary-color-rgb: 226, 232, 240;
+  --tblr-tertiary-color: rgba(226, 232, 240, 0.5);
+  --tblr-tertiary-color-rgb: 226, 232, 240;
+  --tblr-secondary-bg: var(--tblr-gray-800);
+  --tblr-secondary-bg-rgb: 30, 41, 59;
+  --tblr-tertiary-bg: #172033;
+  --tblr-tertiary-bg-rgb: 23, 32, 51;
+  --tblr-card-bg: var(--tblr-bg-surface);
+  --tblr-card-color: var(--tblr-body-color);
+}
+
+.theme-slate[data-bs-theme="dark"] .h3.m-0,
+.theme-slate[data-bs-theme="dark"] .font-weight-medium {
+  color: var(--tblr-white);
+}
+
+/* ---------- Artifex ---------- */
+:root {
+  /* The comment pin colour, the same as bridge.js draws on the artifact. */
+  --afx-pin: #f59f00;
+  --afx-pin-ink: #1c1300;
+  /* Behind artifacts: darker than the page, so a white artifact stands out. */
+  --afx-stage: var(--tblr-gray-950, #020617);
+}
+
+[hidden] { display: none !important; }
+.min-w-0 { min-width: 0; }
+.icon-sm { width: 1rem; height: 1rem; }
+code { white-space: nowrap; }
+
+/* Active navigation reads white with a blue line: Tabler's primary
+ * (#0054a6) is too dark to read on slate. */
+:root { --afx-accent: #3b82f6; }
+.app-navbar { --tblr-navbar-active-border-color: var(--afx-accent); }
+.app-navbar .nav-item.active > .nav-link { color: #f8fafc; }
+.nav-bordered .nav-link.active, .nav-bordered .nav-item.show .nav-link { color: #f8fafc; border-color: var(--afx-accent); }
+textarea.tall { min-height: 6rem; }
+
+.app-navbar .navbar-brand { display: inline-flex; align-items: center; }
+.app-navbar .nav-link-icon .icon { width: 1.25rem; height: 1.25rem; }
+.page-wrapper .page-header { margin: 0 0 1.5rem; }
+.page-title .badge { font-size: .75rem; }
+.page-header .breadcrumb { margin: 0; }
+.page-header .breadcrumb a { color: inherit; }
+.project-tabs { margin-bottom: 0; }
+.project-tabs .nav-link { gap: .375rem; }
+.earlier { margin-bottom: 1rem; }
+.earlier code { white-space: normal; }
+
+/* project cards, side by side */
+.project-list { display: flex; flex-wrap: wrap; gap: 1rem; }
+.project-list > .card { flex: 0 1 calc((100% - 2rem) / 3); min-width: 15rem; margin: 0; }
+@media (max-width: 991.98px) { .project-list > .card { flex-basis: calc((100% - 1rem) / 2); } }
+@media (max-width: 575.98px) { .project-list > .card { flex-basis: 100%; } }
+.project-card .card-footer { margin-top: auto; }
+.project-desc { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+
+/* two cards side by side on the project page */
+.columns { display: flex; gap: 1rem; align-items: flex-start; }
+.columns > :first-child { flex: 3; min-width: 0; }
+.columns > :last-child { flex: 2; min-width: 0; }
+@media (max-width: 991.98px) { .columns { flex-direction: column; align-items: stretch; } }
+.columns > .card { margin: 0; }
+
+details.card-danger > summary { list-style: none; cursor: pointer; display: flex; align-items: center; border-bottom: 0; }
+details.card-danger > summary::-webkit-details-marker { display: none; }
+details.card-danger[open] > summary { border-bottom: var(--tblr-border-width) solid var(--tblr-border-color); }
+
+.version-body pre { white-space: pre-wrap; margin: .25rem 0 0; }
+.version-body summary { cursor: pointer; }
+
+/* commands to copy */
+pre.copyable { position: relative; padding: .75rem 4.75rem .75rem 1rem; white-space: pre-wrap; word-break: break-all; }
+pre.copyable code { white-space: inherit; }
+pre.copyable .copy { position: absolute; top: .5rem; right: .5rem; }
+pre.secret { font-size: 1rem; }
+
+/* ---------- viewer pages: artifact, canvas, file, compare ---------- */
+body.wide .page { height: 100vh; height: 100dvh; }
+body.wide .page-wrapper { min-height: 0; overflow: hidden; }
+.viewer { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+.viewer-head {
+  display: flex; align-items: center; flex-wrap: wrap; gap: .5rem .75rem;
+  padding: .5rem 1rem; background: var(--tblr-bg-surface); border-bottom: var(--tblr-border-width) solid var(--tblr-border-color);
+}
+.viewer-head .breadcrumb { margin: 0; flex-wrap: nowrap; align-items: baseline; min-width: 0; overflow: hidden; }
+.viewer-head .breadcrumb-item { white-space: nowrap; }
+/* Bootstrap floats the separator, which lifts it above a bigger title. */
+.viewer-head .breadcrumb-item + .breadcrumb-item::before { float: none; display: inline; }
+@media (max-width: 767.98px) {
+  .viewer-head .breadcrumb { flex-basis: 100%; }
+  .viewer-head .breadcrumb-item:not(.active):not(:nth-last-child(2)) { display: none; }
+  .viewer-head .breadcrumb-item:nth-last-child(2) { padding-left: 0; }
+  .viewer-head .breadcrumb-item:nth-last-child(2)::before { display: none; }
+}
+.viewer-head .breadcrumb-item:not(.active) a { color: var(--tblr-secondary); }
+.viewer-head .breadcrumb-item.active { min-width: 0; overflow: hidden; color: var(--tblr-body-color); }
+.viewer-title { display: inline; font-size: 1rem; font-weight: var(--tblr-font-weight-bold); margin: 0; overflow: hidden; text-overflow: ellipsis; }
+.viewer-head .zoom { width: auto; }
+.viewer > .earlier { margin: .75rem 1rem 0; }
+
+.split { flex: 1; display: flex; min-height: 0; }
+.stage { flex: 1; overflow: auto; background: var(--afx-stage); position: relative; padding: 1.5rem; }
+.stage.fill { padding: 0; }
+.frame-box { margin: 0 auto; position: relative; background: #fff; box-shadow: 0 .25rem 1.5rem rgba(0, 0, 0, .45); overflow: hidden; }
+.stage.fill .frame-box { box-shadow: none; }
+.frame-box iframe, .board-box iframe { border: 0; display: block; background: #fff; transform-origin: 0 0; }
+.stage.commenting .frame-box { outline: 2px solid var(--afx-pin); outline-offset: 3px; }
+.comment-hint {
+  position: sticky; bottom: .75rem; margin: .75rem auto 0; width: max-content; max-width: 90%;
+  background: var(--tblr-bg-surface); color: var(--tblr-body-color); border: var(--tblr-border-width) solid var(--afx-pin);
+  padding: .375rem .875rem; border-radius: 999px; font-size: .8125rem; box-shadow: var(--tblr-box-shadow-dropdown);
+}
+.file-stage { padding: 0; flex: 1; }
+.file-stage iframe { width: 100%; height: 100%; border: 0; background: #fff; display: block; }
+#comment-toggle[aria-pressed="true"] { box-shadow: 0 0 0 .2rem rgba(var(--tblr-primary-rgb), .35); filter: brightness(.9); }
+
+/* the comments panel */
+.threads {
+  width: 22rem; flex-shrink: 0; overflow-y: auto; padding: 1rem;
+  background: var(--tblr-bg-surface); border-left: var(--tblr-border-width) solid var(--tblr-border-color);
+}
+@media (max-width: 991.98px) {
+  .split { flex-direction: column; }
+  .threads { width: auto; border-left: 0; border-top: var(--tblr-border-width) solid var(--tblr-border-color); max-height: 45vh; }
+}
+.threads-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: .75rem; }
+.composer {
+  display: flex; flex-direction: column; gap: .5rem; margin-bottom: 1rem; padding: .75rem;
+  background: var(--tblr-bg-surface-secondary); border: var(--tblr-border-width) solid var(--tblr-border-color); border-radius: var(--tblr-border-radius);
+}
+.composer .quote, .thread .quote {
+  font-size: .75rem; color: var(--tblr-secondary); border-left: 3px solid var(--afx-pin); padding-left: .5rem;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0;
+}
+.thread-list { display: flex; flex-direction: column; gap: .625rem; }
+.thread {
+  border: var(--tblr-border-width) solid var(--tblr-border-color); border-radius: var(--tblr-border-radius);
+  padding: .625rem .75rem; background: var(--tblr-bg-surface-secondary);
+}
+.thread.active { border-color: var(--afx-pin); box-shadow: 0 0 0 2px rgba(245, 159, 0, .25); }
+.thread.resolved { opacity: .8; }
+.thread .head { display: flex; align-items: center; gap: .5rem; cursor: pointer; }
+.thread .num {
+  flex-shrink: 0; width: 1.375rem; height: 1.375rem; border-radius: 50%; background: var(--afx-pin); color: var(--afx-pin-ink);
+  font-weight: 700; font-size: .75rem; display: inline-flex; align-items: center; justify-content: center;
+}
+.thread.resolved .num { background: var(--tblr-green); color: #fff; }
+.thread .note { font-size: .75rem; color: var(--tblr-yellow); margin: .375rem 0 0; }
+.entry { margin-top: .5rem; }
+.entry .who { font-weight: var(--tblr-font-weight-medium); font-size: .8125rem; color: var(--tblr-body-color); }
+.entry .agent { margin-left: .375rem; font-size: .625rem; vertical-align: 1px; }
+.entry .when { color: var(--tblr-secondary); font-size: .75rem; margin-left: .375rem; }
+.entry .text { white-space: pre-wrap; overflow-wrap: anywhere; margin-top: .125rem; }
+.entry.event { font-size: .75rem; color: var(--tblr-secondary); }
+.thread .reply { margin-top: .5rem; display: flex; flex-direction: column; gap: .375rem; }
+.thread .reply textarea { min-height: 2.5rem; }
+.thread .reply-actions { display: flex; gap: .375rem; }
+.resolved-toggle { margin-top: .375rem; }
+.resolved-toggle > summary { cursor: pointer; margin-bottom: .5rem; }
+
+/* the canvas: every artifact of a folder */
+.chips { display: flex; flex-wrap: wrap; gap: .375rem; padding: .625rem 1rem; background: var(--tblr-bg-surface); border-bottom: var(--tblr-border-width) solid var(--tblr-border-color); }
+.canvas { flex: 1; overflow: auto; background: var(--afx-stage); padding: 1.5rem; display: flex; flex-direction: column; align-items: center; gap: 2.25rem; }
+.board-title { font-size: .875rem; margin: 0 0 .5rem; display: flex; align-items: center; gap: .5rem; }
+.board-title a { color: var(--tblr-body-color); }
+.board-box { background: #fff; box-shadow: 0 .25rem 1.5rem rgba(0, 0, 0, .45); overflow: hidden; position: relative; }
+
+/* compare */
+body.wide .compare-page { flex: 1; overflow: auto; padding: 1rem; }
+.compare { display: flex; gap: 1rem; margin-bottom: 1rem; }
+.compare > figure { margin: 0; min-width: 0; flex: 1; }
+@media (max-width: 767.98px) { .compare { flex-direction: column; } }
+.compare .board-box { background: var(--afx-stage); box-shadow: none; border-radius: 0 0 var(--tblr-card-border-radius) var(--tblr-card-border-radius); }
+.diff {
+  background: var(--tblr-bg-surface-secondary); padding: .75rem; overflow-x: auto; font-size: .75rem; line-height: 1.45;
+  margin: 0; max-height: 70vh; border-radius: 0 0 var(--tblr-card-border-radius) var(--tblr-card-border-radius);
+}
+.diff span { display: block; white-space: pre; min-height: 1.45em; }
+.diff .d-add { background: rgba(var(--tblr-green-rgb), .18); }
+.diff .d-del { background: rgba(var(--tblr-red-rgb), .18); }
+.diff .d-hunk { color: var(--tblr-azure); }
+.diff .d-file { color: var(--tblr-secondary); font-weight: 600; }
+
+/* a short message at the bottom of the page */
+.app-toast {
+  position: fixed; bottom: 1.25rem; left: 50%; transform: translateX(-50%); z-index: 1090;
+  background: var(--tblr-bg-surface-inverted); color: var(--tblr-text-inverted);
+  padding: .5rem 1rem; border-radius: 999px; box-shadow: var(--tblr-box-shadow-dropdown); font-size: .8125rem;
+}

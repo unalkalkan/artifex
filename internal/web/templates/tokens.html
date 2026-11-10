@@ -1,0 +1,64 @@
+{{define "content"}}{{with .Data}}
+<div class="page-header d-print-none">
+  <h2 class="page-title">Tokens</h2>
+  <div class="text-secondary mt-1">A token lets an agent act as you, with your role in each project. Its label shows next to your name in history and comments, as “Claude for you”.</div>
+</div>
+{{with .Created}}
+<div class="card mb-4">
+  <div class="card-status-top bg-green"></div>
+  <div class="card-header"><h3 class="card-title d-flex align-items-center gap-2"><span class="text-green">{{icon "check"}}</span>Your new token: {{.Label}}</h3></div>
+  <div class="card-body">
+    <p><strong>Copy it now.</strong> It is shown only once.</p>
+    <pre class="copyable secret"><code>{{.Secret}}</code></pre>
+    <p>Connect Claude Code:</p>
+    <pre class="copyable"><code>claude mcp add --transport http artifex {{$.Data.MCP}} --header "Authorization: Bearer {{.Secret}}"</code></pre>
+    <p class="mb-0 text-secondary">Agents with a shell can also use git: <code>git clone https://token:&lt;token&gt;@…/git/&lt;project&gt;.git</code> (address: <code>{{$.Data.Git}}&lt;project&gt;.git</code>).</p>
+  </div>
+</div>
+{{end}}
+<div class="card mb-4">
+  <div class="card-header"><h3 class="card-title">Make a token</h3></div>
+  <div class="card-body">
+    <form method="post" class="d-flex flex-wrap gap-2">
+      <input type="hidden" name="csrf" value="{{$.CSRF}}"><input type="hidden" name="action" value="create">
+      <input type="text" name="label" class="form-control flex-fill w-auto" placeholder="Label, e.g. Claude" maxlength="60" value="Claude" aria-label="Label">
+      <button class="btn btn-primary">{{icon "key"}}Make token</button>
+    </form>
+  </div>
+</div>
+<div class="card mb-4">
+  <div class="card-header"><h3 class="card-title">Your tokens</h3></div>
+  <div class="list-group list-group-flush">
+    {{range .Tokens}}{{template "token" (dict "T" . "CSRF" $.CSRF)}}{{else}}
+    <div class="list-group-item text-secondary">No tokens yet.</div>
+    {{end}}
+  </div>
+</div>
+{{if .Others}}
+<div class="card">
+  <div class="card-header"><h3 class="card-title">Everyone else's tokens</h3><div class="card-actions"><span class="badge bg-purple-lt">Admin</span></div></div>
+  <div class="list-group list-group-flush">
+    {{range .Others}}{{template "token" (dict "T" .T "Email" .Email "CSRF" $.CSRF)}}{{end}}
+  </div>
+</div>
+{{end}}
+{{end}}{{end}}
+
+{{/* One token. Call with (dict "T" token "Email" owner-or-empty "CSRF" csrf). */}}
+{{define "token"}}{{$t := .T}}
+<div class="list-group-item">
+  <div class="d-flex flex-wrap align-items-center gap-3">
+    <span class="text-secondary">{{icon "key"}}</span>
+    <div class="me-auto min-w-0">
+      <div class="fw-medium">{{$t.Label}} <code class="ms-1">{{$t.Prefix}}…</code>{{if $t.RevokedAt}} <span class="badge bg-red-lt ms-1">revoked</span>{{end}}</div>
+      <div class="text-secondary small">{{with .Email}}{{.}} · {{end}}made <time datetime="{{iso $t.CreatedAt}}"></time>{{with $t.LastUsedAt}} · last used <time datetime="{{iso .}}"></time>{{else}} · never used{{end}}</div>
+    </div>
+    {{if not $t.RevokedAt}}
+    <form method="post" class="m-0" data-confirm-title="Revoke {{$t.Label}}?" data-confirm-cta="Revoke" data-confirm="Agents using this token stop working at once.">
+      <input type="hidden" name="csrf" value="{{.CSRF}}"><input type="hidden" name="action" value="revoke"><input type="hidden" name="id" value="{{$t.ID}}">
+      <button class="btn btn-sm btn-ghost-danger">{{icon "x"}}Revoke</button>
+    </form>
+    {{end}}
+  </div>
+</div>
+{{end}}

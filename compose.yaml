@@ -1,0 +1,20 @@
+# Artifex behind a reverse proxy that terminates TLS (design decision 18).
+# Copy config.example.yaml to config.yaml first; keep secrets in .env.
+services:
+  artifex:
+    build: .
+    image: artifex:local
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8090:8090" # only the reverse proxy on this host reaches it
+    volumes:
+      - ./data:/data
+      - ./config.yaml:/config/config.yaml:ro
+    environment:
+      ARTIFEX_GOOGLE_CLIENT_SECRET: ${ARTIFEX_GOOGLE_CLIENT_SECRET:-}
+      ARTIFEX_SIGNING_KEY: ${ARTIFEX_SIGNING_KEY:-}
+    logging:
+      driver: json-file
+      options:
+        max-size: 50m
+        max-file: "3"

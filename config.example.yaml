@@ -1,0 +1,48 @@
+# Artifex configuration. Every key is optional; the values shown are the
+# defaults unless marked "example".
+
+# Address the HTTP server binds. In the container: 0.0.0.0:8090.
+listen: 0.0.0.0:8090
+
+# The public address, exactly as people open it: scheme and host, no path.
+# Links, the Google redirect and the content security policy use it, so a
+# different spelling (another host name, http instead of https) breaks the
+# artifact frames. Example:
+base_url: https://artifex.example.com
+
+# Accounts (app.db), project repositories (projects/), the trash of deleted
+# projects (trash/) and, when signing_key is empty, signing.key.
+data_dir: /data
+
+# Read the client address from X-Forwarded-For (the last entry), for rate
+# limits. Only behind a reverse proxy that sets it.
+trust_proxy: true
+
+# Signs content addresses and the Google sign-in state. Empty: read from
+# $ARTIFEX_SIGNING_KEY, else created in data_dir/signing.key on first start.
+# Changing it makes every open artifact address invalid (pages reload them).
+signing_key: ""
+
+google:
+  # From a Google Cloud OAuth client of type "Web application", with the
+  # redirect URI <base_url>/auth/google/callback.
+  client_id: ""
+  # Better in $ARTIFEX_GOOGLE_CLIENT_SECRET than here.
+  client_secret: ""
+  # Only these Google Workspace domains may sign in. Empty: any verified
+  # Google address may sign up, and an Admin's verification is the only gate.
+  allowed_domains: []   # example: [example.com]
+
+# These emails become active Admins the first time they sign in. Everyone
+# else waits until an Admin verifies them.
+admins: []
+
+# Sign in by email with no password, at /auth/dev. Local development only.
+dev_auth: false
+
+limits:
+  max_file_bytes: 26214400      # 25 MB per file
+  max_publish_bytes: 52428800   # 50 MB per publish
+  content_url_ttl: 2h           # how long an artifact address stays valid
+  session_ttl: 720h             # 30 days
+  requests_per_minute: 300      # per client address, on sign-in, MCP and git

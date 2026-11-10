@@ -1,0 +1,72 @@
+{{define "content"}}{{with .Data}}{{$P := .P}}{{$ver := ""}}{{if not .P.IsLatest}}{{$ver = .P.Version}}{{end}}
+{{template "projhead" (dict "P" .P "Tab" "files" "Title" .P.Project.Title "Lead" .P.Project.Description "Open" .Open)}}
+
+{{if not .P.Version}}
+<div class="card">
+  <div class="empty">
+    <div class="empty-icon">{{icon "app-window" "icon-lg"}}</div>
+    <p class="empty-title">Nothing published yet</p>
+    <p class="empty-subtitle text-secondary">Ask an agent to publish to project <code>{{.P.Project.ID}}</code>.</p>
+  </div>
+</div>
+{{else}}
+<div class="columns">
+  <div class="card">
+    <div class="card-header"><h3 class="card-title">Files</h3></div>
+    {{template "listing" (dict "F" .Folder "P" $P "Counts" .Counts "Ver" $ver)}}
+  </div>
+  <div class="card">
+    <div class="card-header">
+      <h3 class="card-title">Recent versions</h3>
+      <div class="card-actions"><a href="/p/{{.P.Project.ID}}/-/history" class="btn btn-sm btn-ghost-secondary">All versions</a></div>
+    </div>
+    <div class="list-group list-group-flush list-group-hoverable">
+      {{range .History}}
+      <a href="/p/{{$P.Project.ID}}?v={{.ID}}" class="list-group-item list-group-item-action{{if and (not $P.IsLatest) (eq .ID $P.Version)}} active{{end}}">
+        <div class="text-reset text-truncate fw-medium">{{.Message}}</div>
+        <div class="text-secondary small">{{.Author}} · <time datetime="{{iso .When}}"></time> · <code>{{.Short}}</code></div>
+      </a>
+      {{end}}
+    </div>
+  </div>
+</div>
+{{end}}
+
+{{if .P.IsOwner}}
+<details class="card card-danger mt-4">
+  <summary class="card-header text-danger">{{icon "trash"}}<span class="ms-2">Delete this project</span></summary>
+  <form method="post" action="/p/{{.P.Project.ID}}/-/delete" class="card-body">
+    <input type="hidden" name="csrf" value="{{$.CSRF}}">
+    <p>The repository moves to the server's trash folder; its members and threads are deleted. Type <code>{{.P.Project.ID}}</code> to confirm.</p>
+    <div class="d-flex flex-wrap gap-2">
+      <input type="text" name="confirm" class="form-control w-auto" autocomplete="off" required aria-label="Project id">
+      <button class="btn btn-danger">Delete project</button>
+    </div>
+  </form>
+</details>
+{{end}}
+{{end}}{{end}}
+
+{{define "listing"}}{{$P := .P}}{{$ver := .Ver}}{{$counts := .Counts}}
+<div class="list-group list-group-flush list-group-hoverable listing">
+  {{range .F.Folders}}
+  <a class="list-group-item list-group-item-action d-flex align-items-center gap-2" href="/p/{{$P.Project.ID}}/{{esc .Path}}{{if $ver}}?v={{$ver}}{{end}}">
+    <span class="text-yellow">{{icon "folder"}}</span><span class="fw-medium">{{base .Path}}/</span>
+  </a>
+  {{end}}
+  {{range .F.Artifacts}}
+  <a class="list-group-item list-group-item-action d-flex align-items-center gap-2" href="/p/{{$P.Project.ID}}/{{esc .Path}}{{if $ver}}?v={{$ver}}{{end}}">
+    <span class="text-azure">{{icon "app-window"}}</span>
+    <span class="text-reset text-truncate">{{.Title}}</span>
+    {{if ne .Title .Name}}<span class="text-secondary small text-truncate">{{.Name}}</span>{{end}}
+    {{with index $counts .Path}}<span class="badge bg-orange-lt ms-auto" title="Open comments">{{icon "message-circle" "icon-sm"}}{{.}}</span>{{end}}
+  </a>
+  {{end}}
+  {{range .F.Files}}
+  <a class="list-group-item list-group-item-action d-flex align-items-center gap-2" href="/p/{{$P.Project.ID}}/{{esc .Path}}{{if $ver}}?v={{$ver}}{{end}}">
+    <span class="text-secondary">{{icon "file"}}</span><span class="text-reset text-truncate">{{base .Path}}</span>
+    <span class="text-secondary small ms-auto">{{size .Size}}</span>
+  </a>
+  {{end}}
+</div>
+{{end}}

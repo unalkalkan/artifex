@@ -1,0 +1,44 @@
+{{define "content"}}{{with .Data}}{{$P := .P}}{{$ver := ""}}{{if not .P.IsLatest}}{{$ver = .P.Version}}{{end}}
+<div class="viewer">
+  <div class="viewer-head">
+    <ol class="breadcrumb breadcrumb-arrows" aria-label="Breadcrumb">
+      {{template "crumbs" (dict "P" .P "Path" (parent .Dir))}}
+      <li class="breadcrumb-item active" aria-current="page"><h1 class="viewer-title">{{.FolderTitle}}</h1></li>
+    </ol>
+    {{if .Folder.Meta.Label}}<span class="badge bg-yellow-lt text-uppercase">{{.Folder.Meta.Label}}</span>{{end}}
+    <span class="text-secondary small text-nowrap">{{len .Frames}} artifact{{if ne (len .Frames) 1}}s{{end}}</span>
+    <div class="btn-list ms-auto flex-nowrap">
+      <select id="zoom" class="form-select form-select-sm zoom" title="Zoom" aria-label="Zoom">
+        <option value="fit">Fit</option><option value="0.25">25%</option><option value="0.5">50%</option><option value="0.75">75%</option><option value="1">100%</option>
+      </select>
+      <a class="btn btn-sm" href="/p/{{.P.Project.ID}}/-/history" title="Versions of this project">{{icon "history"}}<span class="d-none d-xl-inline">History</span></a>
+    </div>
+  </div>
+  {{template "earlier" .P}}
+  {{if or .Folder.Folders .Folder.Files}}
+  <div class="chips">
+    {{range .Folder.Folders}}<a class="btn btn-sm btn-pill" href="/p/{{$P.Project.ID}}/{{esc .Path}}{{if $ver}}?v={{$ver}}{{end}}"><span class="text-yellow">{{icon "folder"}}</span>{{base .Path}}/</a>{{end}}
+    {{range .Folder.Files}}<a class="btn btn-sm btn-pill btn-ghost-secondary" href="/p/{{$P.Project.ID}}/{{esc .Path}}{{if $ver}}?v={{$ver}}{{end}}">{{icon "file"}}{{base .Path}}</a>{{end}}
+  </div>
+  {{end}}
+  {{if .Frames}}
+  <div class="canvas" id="canvas">
+    {{range .Frames}}
+    <section class="board" data-path="{{.Path}}" data-width="{{.Width}}">
+      <h2 class="board-title"><a href="/p/{{$P.Project.ID}}/{{esc .Path}}{{if $ver}}?v={{$ver}}{{end}}">{{.Title}}</a>{{if .Open}} <span class="badge bg-orange-lt" title="Open comments">{{icon "message-circle" "icon-sm"}}{{.Open}}</span>{{end}}</h2>
+      <div class="board-box"><iframe title="{{.Title}}" loading="lazy" sandbox="{{sandbox}}" src="{{.URL}}" data-path="{{.Path}}"></iframe></div>
+    </section>
+    {{end}}
+  </div>
+  {{else}}
+  <div class="canvas">
+    <div class="card"><div class="empty">
+      <div class="empty-icon">{{icon "layout-cards" "icon-lg"}}</div>
+      <p class="empty-title">No HTML artifacts here</p>
+      <p class="empty-subtitle text-secondary">This folder has no HTML files to show.</p>
+    </div></div>
+  </div>
+  {{end}}
+</div>
+<script type="application/json" id="canvas-data">{{json .Config}}</script>
+{{end}}{{end}}

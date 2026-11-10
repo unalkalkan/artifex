@@ -1,0 +1,57 @@
+{{define "content"}}{{with .Data}}{{$P := .P}}{{$me := .Me}}
+{{template "projhead" (dict "P" .P "Tab" "members" "Title" "Members" "Lead" "Commenters view and comment. Editors also publish through agents and restore versions. Owners also manage members.")}}
+<div class="card">
+  <div class="list-group list-group-flush">
+    {{range .Members}}
+    <div class="list-group-item">
+      <div class="d-flex flex-wrap align-items-center gap-3">
+        <span class="avatar avatar-sm">{{initials .Name .Email}}</span>
+        <div class="me-auto min-w-0">
+          <div class="fw-medium text-truncate">{{if .Name}}{{.Name}}{{else}}{{.Email}}{{end}}{{if eq .Email $me}} <span class="badge bg-secondary-lt ms-1">You</span>{{end}}</div>
+          <div class="text-secondary small text-truncate">{{.Email}}{{if .Invited}} · invited, not signed in yet{{end}}</div>
+        </div>
+        {{if $P.IsOwner}}
+        <form method="post" class="m-0">
+          <input type="hidden" name="csrf" value="{{$.CSRF}}"><input type="hidden" name="action" value="set"><input type="hidden" name="email" value="{{.Email}}">
+          <div class="d-flex gap-2">
+            <select name="role" class="form-select form-select-sm w-auto" data-autosubmit aria-label="Role of {{.Email}}">
+              <option value="commenter"{{if eq .Role "commenter"}} selected{{end}}>Commenter</option>
+              <option value="editor"{{if eq .Role "editor"}} selected{{end}}>Editor</option>
+              <option value="owner"{{if eq .Role "owner"}} selected{{end}}>Owner</option>
+            </select>
+            <noscript><button class="btn btn-sm">Save</button></noscript>
+          </div>
+        </form>
+        <form method="post" class="m-0" data-confirm-title="Remove {{.Email}}?" data-confirm-cta="Remove" data-confirm="They lose access to this project. Their comments stay.">
+          <input type="hidden" name="csrf" value="{{$.CSRF}}"><input type="hidden" name="action" value="remove"><input type="hidden" name="email" value="{{.Email}}">
+          <button class="btn btn-sm btn-ghost-danger">{{icon "user-minus"}}Remove</button>
+        </form>
+        {{else}}
+        {{template "role" (dict "Role" .Role)}}
+        {{if eq .Email $me}}
+        <form method="post" class="m-0" data-confirm-title="Leave this project?" data-confirm-cta="Leave" data-confirm="You lose access until an Owner adds you again.">
+          <input type="hidden" name="csrf" value="{{$.CSRF}}"><input type="hidden" name="action" value="remove"><input type="hidden" name="email" value="{{.Email}}">
+          <button class="btn btn-sm btn-ghost-danger">{{icon "door-exit"}}Leave</button>
+        </form>
+        {{end}}
+        {{end}}
+      </div>
+    </div>
+    {{end}}
+  </div>
+</div>
+{{if .P.IsOwner}}
+<div class="card mt-4">
+  <div class="card-header"><h3 class="card-title d-flex align-items-center gap-2">{{icon "user-plus" "text-secondary"}}Add someone</h3></div>
+  <div class="card-body">
+    <form method="post" class="d-flex flex-wrap gap-2">
+      <input type="hidden" name="csrf" value="{{$.CSRF}}"><input type="hidden" name="action" value="set">
+      <input type="email" name="email" class="form-control flex-fill w-auto" placeholder="name@example.com" required aria-label="Email address">
+      <select name="role" class="form-select w-auto" aria-label="Role"><option value="commenter">Commenter</option><option value="editor">Editor</option><option value="owner">Owner</option></select>
+      <button class="btn btn-primary">{{icon "plus"}}Add</button>
+    </form>
+    <div class="form-hint mt-2">Someone who hasn't signed in yet is invited, and gets the role once an Admin verifies their account.</div>
+  </div>
+</div>
+{{end}}
+{{end}}{{end}}

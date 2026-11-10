@@ -1,0 +1,19 @@
+{{define "content"}}{{with .Data}}
+<div class="viewer">
+  <div class="viewer-head">
+    <ol class="breadcrumb breadcrumb-arrows" aria-label="Breadcrumb">
+      {{template "crumbs" (dict "P" .P "Path" (parent .Path))}}
+      <li class="breadcrumb-item active" aria-current="page"><h1 class="viewer-title">{{base .Path}}</h1></li>
+    </ol>
+    <span class="text-secondary small text-nowrap">{{size .Size}}</span>
+    <div class="btn-list ms-auto flex-nowrap">
+      <a class="btn btn-sm" href="/p/{{.P.Project.ID}}/-/history?path={{.Path}}" title="Versions of this file">{{icon "history"}}<span class="d-none d-md-inline">History</span></a>
+      <a class="btn btn-sm" href="{{.URL}}" target="_blank" rel="noopener" title="Open the file alone in a new tab">{{icon "external-link"}}<span class="d-none d-md-inline">Open alone</span></a>
+    </div>
+  </div>
+  {{template "earlier" .P}}
+  <div class="stage file-stage">
+    <iframe title="{{base .Path}}" sandbox="{{sandbox}}" src="{{.URL}}"></iframe>
+  </div>
+</div>
+{{end}}{{end}}

@@ -1,0 +1,33 @@
+{{define "content"}}{{with .Data}}{{$P := .P}}
+<div class="viewer-head">
+  <ol class="breadcrumb breadcrumb-arrows" aria-label="Breadcrumb">
+    {{template "crumbs" (dict "P" .P "Path" "")}}
+    <li class="breadcrumb-item"><a href="/p/{{.P.Project.ID}}/-/history{{if .Path}}?path={{.Path}}{{end}}">History</a></li>
+    <li class="breadcrumb-item active" aria-current="page"><h1 class="viewer-title">Changes{{if .Path}} to {{.Path}}{{end}}</h1></li>
+  </ol>
+</div>
+<div class="compare-page">
+  <p class="text-secondary">
+    {{if .From}}From <code>{{short .From}}</code>{{with .FromV}} “{{.Message}}”{{end}}{{else}}From nothing{{end}}
+    to <code>{{short .To}}</code>{{with .ToV}} “{{.Message}}” by {{.Author}}, <time datetime="{{iso .When}}"></time>{{end}}.
+  </p>
+  {{if .ToURL}}
+  <div class="compare" id="compare" data-width="{{.Frames.width}}">
+    <figure class="card">
+      <figcaption class="card-header"><h3 class="card-title">Before{{if .From}} <code class="ms-2">{{short .From}}</code>{{end}}</h3></figcaption>
+      <div class="board-box">{{if .FromURL}}<iframe title="Before" sandbox="{{sandbox}}" src="{{.FromURL}}"></iframe>{{else}}<p class="text-secondary p-4 m-0">The artifact didn't exist yet.</p>{{end}}</div>
+    </figure>
+    <figure class="card">
+      <figcaption class="card-header"><h3 class="card-title">After <code class="ms-2">{{short .To}}</code></h3></figcaption>
+      <div class="board-box"><iframe title="After" sandbox="{{sandbox}}" src="{{.ToURL}}"></iframe></div>
+    </figure>
+  </div>
+  {{end}}
+  <div class="card">
+    <div class="card-header"><h3 class="card-title d-flex align-items-center gap-2">{{icon "git-compare" "text-secondary"}}Source</h3></div>
+    {{if .Diff}}
+    <pre class="diff">{{range .Diff}}<span class="d-{{.Kind}}">{{.Text}}</span>{{end}}</pre>
+    {{else}}<div class="card-body text-secondary">No changes{{if .Path}} to this file{{end}}.</div>{{end}}
+  </div>
+</div>
+{{end}}{{end}}

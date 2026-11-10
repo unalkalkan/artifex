@@ -1,0 +1,131 @@
+{{define "layout.html"}}<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>{{.Title}} · Artifex</title>
+<link rel="icon" href="{{asset "icon.svg"}}" type="image/svg+xml">
+<link rel="stylesheet" href="{{asset "vendor/tabler/tabler.min.css"}}">
+<link rel="stylesheet" href="{{asset "app.css"}}">
+<script src="{{asset "vendor/tabler/tabler.min.js"}}" defer></script>
+<script src="{{asset "app.js"}}" defer></script>
+</head>
+{{/* Tabler's dark slate theme; theme-slate's colours are in app.css (design decision 22). */}}
+<body class="theme-dark theme-slate{{if .Wide}} wide{{end}}" data-bs-theme="dark" data-page="{{.Page}}"{{if .CSRF}} data-csrf="{{.CSRF}}"{{end}}>
+<div class="page{{if not .Account}} page-center{{end}}">
+  {{if .Account}}
+  <header class="navbar navbar-expand-md d-print-none app-navbar">
+    <div class="container-xl">
+      <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar-menu" aria-controls="navbar-menu" aria-expanded="false" aria-label="Open navigation">
+        <span class="navbar-toggler-icon"></span>
+      </button>
+      <a class="navbar-brand navbar-brand-autodark pe-0 pe-md-3 gap-2" href="/"><img src="{{asset "icon.svg"}}" alt="" width="24" height="24">Artifex</a>
+      <div class="d-flex order-md-last align-items-center gap-3">
+        <span class="text-secondary d-none d-lg-inline" title="{{.Account.Email}}">{{.Account.DisplayName}} · {{if .Account.IsAdmin}}Admin{{else}}Member{{end}}</span>
+        <form method="post" action="/logout" class="m-0">
+          <input type="hidden" name="csrf" value="{{.CSRF}}">
+          <button class="btn btn-sm btn-outline-light">{{icon "logout"}}Sign out</button>
+        </form>
+      </div>
+      <div class="collapse navbar-collapse" id="navbar-menu">
+        <ul class="navbar-nav">
+          <li class="nav-item{{if and (ne .Page "tokens") (ne .Page "accounts")}} active{{end}}">
+            <a class="nav-link" href="/"><span class="nav-link-icon">{{icon "folders"}}</span><span class="nav-link-title">Projects</span></a>
+          </li>
+          <li class="nav-item{{if eq .Page "tokens"}} active{{end}}">
+            <a class="nav-link" href="/tokens"><span class="nav-link-icon">{{icon "key"}}</span><span class="nav-link-title">Tokens</span></a>
+          </li>
+          {{if .Account.IsAdmin}}
+          <li class="nav-item{{if eq .Page "accounts"}} active{{end}}">
+            <a class="nav-link" href="/admin/accounts"><span class="nav-link-icon">{{icon "users"}}</span><span class="nav-link-title">Accounts</span></a>
+          </li>
+          {{end}}
+        </ul>
+      </div>
+    </div>
+  </header>
+  {{end}}
+  <div class="page-wrapper">
+    {{if .Wide}}
+      {{if .Error}}<div class="alert alert-danger m-3 mb-0" role="alert">{{.Error}}</div>{{end}}
+      {{template "content" .}}
+    {{else}}
+    <div class="page-body">
+      <div class="container-xl">
+        {{if and .Error (ne .Page "error")}}<div class="alert alert-danger" role="alert">{{.Error}}</div>{{end}}
+        {{template "content" .}}
+      </div>
+    </div>
+    {{end}}
+  </div>
+</div>
+{{/* Asks before a form with data-confirm is sent (app.js). */}}
+<div class="modal modal-blur fade" id="confirm-modal" tabindex="-1" aria-labelledby="confirm-title" aria-hidden="true">
+  <div class="modal-dialog modal-sm modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-status bg-danger"></div>
+      <div class="modal-body text-center py-4">
+        <div class="text-danger mb-2">{{icon "alert-triangle" "icon-lg"}}</div>
+        <h3 id="confirm-title">Are you sure?</h3>
+        <div class="text-secondary" data-confirm-body></div>
+      </div>
+      <div class="modal-footer">
+        <div class="d-flex w-100 gap-2">
+          <button type="button" class="btn w-100" data-bs-dismiss="modal">Cancel</button>
+          <button type="button" class="btn btn-danger w-100" data-confirm-cta>Continue</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<div id="toast" class="app-toast" role="status" hidden></div>
+</body>
+</html>{{end}}
+
+{{/* A role, as a badge. Call with (dict "Role" role "Admin" bool). */}}
+{{define "role"}}{{if .Admin}}<span class="badge bg-purple-lt">Admin</span>{{else if eq .Role "owner"}}<span class="badge bg-azure-lt">Owner</span>{{else if eq .Role "editor"}}<span class="badge bg-green-lt">Editor</span>{{else}}<span class="badge bg-secondary-lt">{{title .Role}}</span>{{end}}{{end}}
+
+{{/* Where a viewer page is: Projects › project › folders. Call with (dict "P" .P "Path" folder). */}}
+{{define "crumbs"}}{{$p := .P}}
+<li class="breadcrumb-item"><a href="/">Projects</a></li>
+<li class="breadcrumb-item"><a href="/p/{{$p.Project.ID}}{{if not $p.IsLatest}}?v={{$p.Version}}{{end}}">{{$p.Project.Title}}</a></li>
+{{range crumbs .Path}}<li class="breadcrumb-item"><a href="/p/{{$p.Project.ID}}/{{esc .Path}}{{if not $p.IsLatest}}?v={{$p.Version}}{{end}}">{{.Name}}</a></li>{{end}}
+{{end}}
+
+{{/* The header of a project's own pages: files, history, members. Call with
+     (dict "P" .P "Tab" "files" "Title" title "Lead" text "Open" path). */}}
+{{define "projhead"}}{{$P := .P}}
+<div class="page-header d-print-none">
+  <div class="d-flex flex-wrap align-items-end gap-3">
+    <div class="me-auto min-w-0">
+      <ol class="breadcrumb breadcrumb-arrows page-pretitle" aria-label="Breadcrumb">
+        <li class="breadcrumb-item"><a href="/">Projects</a></li>
+        {{if ne .Tab "files"}}<li class="breadcrumb-item"><a href="/p/{{$P.Project.ID}}">{{$P.Project.Title}}</a></li>{{end}}
+      </ol>
+      <h2 class="page-title gap-2 mt-1">{{.Title}} {{template "role" (dict "Role" $P.Role "Admin" (eq $P.Project.Role "admin"))}}</h2>
+      {{with .Lead}}<div class="text-secondary mt-1">{{.}}</div>{{end}}
+    </div>
+    {{if .Open}}
+    <div class="btn-list">
+      <a class="btn btn-primary" href="/p/{{$P.Project.ID}}/{{esc .Open}}{{if not $P.IsLatest}}?v={{$P.Version}}{{end}}">{{icon "app-window"}}Open {{base .Open}}</a>
+    </div>
+    {{end}}
+  </div>
+  <ul class="nav nav-bordered mt-3 project-tabs">
+    <li class="nav-item"><a class="nav-link{{if eq .Tab "files"}} active{{end}}"{{if eq .Tab "files"}} aria-current="page"{{end}} href="/p/{{$P.Project.ID}}">{{icon "folder"}}Files</a></li>
+    <li class="nav-item"><a class="nav-link{{if eq .Tab "history"}} active{{end}}"{{if eq .Tab "history"}} aria-current="page"{{end}} href="/p/{{$P.Project.ID}}/-/history">{{icon "history"}}History</a></li>
+    <li class="nav-item"><a class="nav-link{{if eq .Tab "members"}} active{{end}}"{{if eq .Tab "members"}} aria-current="page"{{end}} href="/p/{{$P.Project.ID}}/-/members">{{icon "users"}}Members</a></li>
+  </ul>
+</div>
+{{template "earlier" $P}}
+{{end}}
+
+{{/* The notice on a page that shows an earlier version. Call with .P. */}}
+{{define "earlier"}}{{if and .Version (not .IsLatest)}}
+<div class="alert alert-warning earlier" role="status">
+  <div class="d-flex gap-2">
+    <div>{{icon "history" "alert-icon"}}</div>
+    <div>You are looking at an earlier version, <code>{{short .Version}}</code>{{with .VersionAt}}: “{{.Message}}” by {{.Author}}, <time datetime="{{iso .When}}"></time>{{end}}. <a href="?" class="alert-link">Show the latest</a></div>
+  </div>
+</div>
+{{end}}{{end}}

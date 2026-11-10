@@ -1,0 +1,53 @@
+{{define "content"}}{{with .Data}}{{$P := .P}}{{$path := .Path}}
+{{if .Path}}
+{{template "projhead" (dict "P" .P "Tab" "history" "Title" "History" "Lead" (print "Versions that changed " .Path ", newest first."))}}
+{{else}}
+{{template "projhead" (dict "P" .P "Tab" "history" "Title" "History" "Lead" "Every version of the project, newest first.")}}
+{{end}}
+{{if eq $.Notice "restored"}}<div class="alert alert-success" role="status">Restored. The old content is the newest version now.</div>{{end}}
+<div class="card">
+  {{if .Path}}
+  <div class="card-header">
+    <h3 class="card-title text-truncate"><code>{{.Path}}</code></h3>
+    <div class="card-actions"><a class="btn btn-sm btn-ghost-secondary" href="/p/{{.P.Project.ID}}/-/history">Whole project</a></div>
+  </div>
+  {{end}}
+  <div class="list-group list-group-flush versions">
+    {{range $i, $v := .Versions}}
+    <div class="list-group-item">
+      <div class="d-flex flex-wrap align-items-start gap-3">
+        <div class="me-auto min-w-0">
+          <div class="fw-medium">{{.Message}}{{if and (eq $i 0) (eq $P.Latest .ID)}} <span class="badge bg-green-lt ms-1">latest</span>{{end}}</div>
+          <div class="text-secondary small">{{.Author}} · <time datetime="{{iso .When}}"></time> · <code>{{.Short}}</code></div>
+          {{if .Body}}<details class="version-body"><summary class="text-secondary small">More</summary><pre>{{.Body}}</pre></details>{{end}}
+        </div>
+        <div class="btn-list">
+          {{if $path}}
+          <a class="btn btn-sm" href="/p/{{$P.Project.ID}}/{{esc $path}}?v={{.ID}}">{{icon "eye"}}View</a>
+          {{else}}
+          <a class="btn btn-sm" href="/p/{{$P.Project.ID}}?v={{.ID}}">{{icon "eye"}}Browse</a>
+          {{end}}
+          <a class="btn btn-sm" href="/p/{{$P.Project.ID}}/-/compare?to={{.ID}}{{if $path}}&path={{$path}}{{end}}">{{icon "git-compare"}}Changes</a>
+          {{if ne $P.Latest .ID}}
+          <a class="btn btn-sm" href="/p/{{$P.Project.ID}}/-/compare?from={{.ID}}&to={{$P.Latest}}{{if $path}}&path={{$path}}{{end}}">Compare with latest</a>
+          {{if $P.CanEdit}}
+          <form method="post" action="/p/{{$P.Project.ID}}/-/restore" class="m-0" data-confirm-title="Restore version {{.Short}}?" data-confirm-cta="Restore" data-confirm-variant="primary" data-confirm="This restores {{if $path}}{{$path}}{{else}}the whole project{{end}} as a new version. Nothing is lost: the current content stays in the history.">
+            <input type="hidden" name="csrf" value="{{$.CSRF}}"><input type="hidden" name="version" value="{{.ID}}"><input type="hidden" name="path" value="{{$path}}">
+            <button class="btn btn-sm btn-outline-warning">{{icon "restore"}}Restore</button>
+          </form>
+          {{end}}{{end}}
+        </div>
+      </div>
+    </div>
+    {{else}}
+    <div class="list-group-item text-secondary">No versions yet.</div>
+    {{end}}
+  </div>
+  {{if or (gt .Page 0) .More}}
+  <div class="card-footer d-flex">
+    {{if gt .Page 0}}<a class="btn btn-sm" href="?{{if .Path}}path={{.Path}}&{{end}}page={{sub .Page 1}}">{{icon "arrow-left"}}Newer</a>{{end}}
+    {{if .More}}<a class="btn btn-sm ms-auto" href="?{{if .Path}}path={{.Path}}&{{end}}page={{add .Page 1}}">Older{{icon "arrow-right" "ms-1 me-0"}}</a>{{end}}
+  </div>
+  {{end}}
+</div>
+{{end}}{{end}}

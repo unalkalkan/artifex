@@ -1,0 +1,5 @@
+bin
+data
+config.yaml
+.env
+.git

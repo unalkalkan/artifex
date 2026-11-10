@@ -1,0 +1,57 @@
+{{define "content"}}{{with .Data}}
+<div class="page-header d-print-none">
+  <h2 class="page-title">Projects</h2>
+  <div class="text-secondary mt-1">What agents published, for you to look at and comment on.</div>
+</div>
+{{if .Projects}}
+<div class="project-list">
+  {{range .Projects}}{{template "project-card" .}}{{end}}
+</div>
+{{else}}
+<div class="card">
+  <div class="empty">
+    <div class="empty-icon">{{icon "folders" "icon-lg"}}</div>
+    <p class="empty-title">No projects yet</p>
+    <p class="empty-subtitle text-secondary">Projects are created by agents. Connect one (below) and ask it to publish something; you become the project's owner.</p>
+  </div>
+</div>
+{{end}}
+
+{{if .Others}}
+<div class="page-header d-print-none mt-5">
+  <h3 class="page-title">Other projects</h3>
+  <div class="text-secondary mt-1">You see these as an Admin.</div>
+</div>
+<div class="project-list">
+  {{range .Others}}{{template "project-card" .}}{{end}}
+</div>
+{{end}}
+
+<div class="card mt-5">
+  <div class="card-header">
+    <h3 class="card-title d-flex align-items-center gap-2">{{icon "plug-connected" "text-secondary"}}Connect an agent</h3>
+  </div>
+  <div class="card-body">
+    <p>Agents publish over MCP with a token. <a href="/tokens">Make a token</a>, then in Claude Code:</p>
+    <pre class="copyable"><code>claude mcp add --transport http artifex {{.MCP}} --header "Authorization: Bearer &lt;token&gt;"</code></pre>
+    <p class="text-secondary mb-0">Then ask it, for example: “Publish a mockup of a sign-up page to Artifex, project demo.”</p>
+  </div>
+</div>
+{{end}}{{end}}
+
+{{define "project-card"}}
+<a href="/p/{{.ID}}" class="card card-link card-link-pop project-card">
+  <div class="card-body">
+    <div class="d-flex align-items-center gap-2">
+      <span class="text-azure">{{icon "folder"}}</span>
+      <h3 class="card-title m-0 text-truncate">{{.Title}}</h3>
+    </div>
+    {{if ne .Title .ID}}<div class="text-secondary small font-monospace mt-1">{{.ID}}</div>{{end}}
+    {{if .Description}}<p class="text-secondary mt-2 mb-0 project-desc">{{.Description}}</p>{{end}}
+  </div>
+  <div class="card-footer d-flex align-items-center gap-2 small">
+    {{if .Role}}{{template "role" (dict "Role" .Role "Admin" (eq .Role "admin"))}}{{end}}
+    <span class="text-secondary">updated <time datetime="{{iso .UpdatedAt}}"></time></span>
+  </div>
+</a>
+{{end}}

@@ -1,0 +1,15 @@
+{{define "content"}}
+<div class="container-tight py-4">
+  <div class="text-center mb-4">
+    <span class="navbar-brand navbar-brand-autodark gap-2 fs-2"><img src="{{asset "icon.svg"}}" alt="" width="32" height="32">Artifex</span>
+  </div>
+  <div class="card card-md">
+    <div class="card-body text-center">
+      <div class="text-secondary mb-3">{{icon "info-circle" "icon-lg"}}</div>
+      <h2 class="h2 mb-2">{{.Title}}</h2>
+      <p class="text-secondary">{{.Notice}}</p>
+      <a class="btn" href="/login">Back to sign-in</a>
+    </div>
+  </div>
+</div>
+{{end}}

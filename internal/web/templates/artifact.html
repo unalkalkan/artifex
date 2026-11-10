@@ -1,0 +1,50 @@
+{{define "content"}}{{with .Data}}{{$ver := ""}}{{if not .P.IsLatest}}{{$ver = .P.Version}}{{end}}
+<div class="viewer">
+  <div class="viewer-head">
+    <ol class="breadcrumb breadcrumb-arrows" aria-label="Breadcrumb">
+      {{template "crumbs" (dict "P" .P "Path" (parent .Path))}}
+      <li class="breadcrumb-item active" aria-current="page"><h1 class="viewer-title">{{.Meta.Title}}</h1></li>
+    </ol>
+    {{if .Folder.Meta.Label}}<span class="badge bg-yellow-lt text-uppercase">{{.Folder.Meta.Label}}</span>{{end}}
+    <div class="btn-list ms-auto flex-nowrap">
+      {{if or .Prev .Next}}
+      <div class="btn-group">
+        {{if .Prev}}<a class="btn btn-sm btn-icon" href="/p/{{.P.Project.ID}}/{{esc .Prev}}{{if $ver}}?v={{$ver}}{{end}}" title="Previous in this folder" aria-label="Previous in this folder">{{icon "arrow-left"}}</a>{{end}}
+        {{if .Next}}<a class="btn btn-sm btn-icon" href="/p/{{.P.Project.ID}}/{{esc .Next}}{{if $ver}}?v={{$ver}}{{end}}" title="Next in this folder" aria-label="Next in this folder">{{icon "arrow-right"}}</a>{{end}}
+      </div>
+      {{end}}
+      <a class="btn btn-sm" href="/p/{{.P.Project.ID}}/{{if parent .Path}}{{esc (parent .Path)}}{{end}}{{if $ver}}?v={{$ver}}{{end}}" title="All artifacts of this folder on one page">{{icon "layout-cards"}}<span class="d-none d-xl-inline">Canvas</span></a>
+      {{if .Meta.Width}}
+      <select id="zoom" class="form-select form-select-sm zoom" title="Zoom" aria-label="Zoom">
+        <option value="fit">Fit</option><option value="0.5">50%</option><option value="0.75">75%</option><option value="1">100%</option>
+      </select>
+      {{end}}
+      <a class="btn btn-sm" href="/p/{{.P.Project.ID}}/-/history?path={{.Path}}" title="Versions of this artifact">{{icon "history"}}<span class="d-none d-xl-inline">History</span></a>
+      <a class="btn btn-sm btn-icon" id="open-alone" href="{{.Frame.url}}" target="_blank" rel="noopener" title="Open the artifact alone in a new tab" aria-label="Open alone">{{icon "external-link"}}</a>
+      <button id="comment-toggle" class="btn btn-sm btn-primary" type="button" title="Click a spot on the artifact to comment (C)" aria-pressed="false">{{icon "message-plus"}}Comment</button>
+    </div>
+  </div>
+  {{template "earlier" .P}}
+  <div class="split">
+    <div class="stage" id="stage">
+      <div class="frame-box" id="frame-box">
+        <iframe id="frame" title="{{.Meta.Title}}" sandbox="{{sandbox}}" src="{{.Frame.url}}"></iframe>
+      </div>
+      <div class="comment-hint" id="comment-hint" hidden>Click the spot you want to comment on. <kbd>Esc</kbd> cancels.</div>
+    </div>
+    <aside class="threads" id="threads" aria-label="Comments">
+      <div class="threads-head">
+        <h2 class="card-title m-0 d-flex align-items-center gap-2">{{icon "message-circle" "text-secondary"}}Comments</h2>
+        <span id="thread-count" class="badge bg-orange-lt" hidden></span>
+      </div>
+      <form id="composer" class="composer" hidden>
+        <div class="quote" id="composer-quote"></div>
+        <textarea id="composer-body" class="form-control tall" placeholder="What should change here?" required aria-label="Comment"></textarea>
+        <div class="d-flex gap-2"><button class="btn btn-primary btn-sm">Comment</button><button type="button" class="btn btn-sm btn-ghost-secondary" id="composer-cancel">Cancel</button></div>
+      </form>
+      <div id="thread-list" class="thread-list"><p class="text-secondary">Loading…</p></div>
+    </aside>
+  </div>
+</div>
+<script type="application/json" id="frame-data">{{json .Frame}}</script>
+{{end}}{{end}}

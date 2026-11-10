@@ -1,0 +1,12 @@
+{{define "content"}}
+<div class="container-tight py-4">
+  <div class="empty">
+    <div class="empty-icon text-secondary">{{icon "alert-triangle" "icon-lg"}}</div>
+    <p class="empty-title">{{.Title}}</p>
+    {{with .Error}}<p class="empty-subtitle text-secondary">{{.}}</p>{{end}}
+    <div class="empty-action">
+      <a class="btn btn-primary" href="/">{{icon "arrow-left"}}Back to your projects</a>
+    </div>
+  </div>
+</div>
+{{end}}
