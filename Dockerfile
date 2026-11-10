@@ -14,9 +14,11 @@ RUN CGO_ENABLED=1 go build -trimpath -ldflags "-s -w -X main.version=${VERSION}"
 # out of the browser would find nothing. Build it with --target renderer.
 FROM debian:bookworm-slim AS renderer
 RUN apt-get update \
- && apt-get install -y --no-install-recommends chromium fonts-liberation fonts-noto-color-emoji ca-certificates \
+ && apt-get install -y --no-install-recommends chromium fonts-liberation fonts-dejavu-core fonts-noto-color-emoji ca-certificates \
  && rm -rf /var/lib/apt/lists/* \
  && groupadd -g 10002 renderer && useradd -r -u 10002 -g renderer -d /tmp -M renderer
+# Which font each generic family gets; without it, system-ui is monospace.
+COPY internal/render/fonts.conf /etc/fonts/local.conf
 COPY --from=build /out/artifex /usr/local/bin/artifex
 USER 10002:10002
 EXPOSE 8091

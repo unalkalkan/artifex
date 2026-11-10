@@ -577,9 +577,12 @@ agent wants to show (decision 5). Everything below holds for mockups too.
 - **Costs:**
   - The renderer's image is about 1.1 GB, against 270 MB for Artifex's. A screenshot takes about a second
     and a few hundred MB of memory while it runs.
-  - System fonts: a font the artifact doesn't bring is drawn with the renderer's fonts (Liberation, Noto
-    Color Emoji), which may differ from a reader's. Artifacts that bring their fonts (decision 11) look the
-    same.
+  - System fonts: a font the artifact doesn't bring is drawn with the renderer's own, which may differ
+    from a reader's. Artifacts that bring their fonts (decision 11) look the same. The generic families,
+    `system-ui` included, are Liberation, with the metrics of Arial, Times New Roman and Courier New, the
+    closest free match to what readers' browsers use; DejaVu fills in symbols such as check marks and
+    arrows, and Noto Color Emoji the emoji. `internal/render/fonts.conf` sets this: without it, `system-ui`
+    came out in Liberation Mono, because Chromium takes it from fontconfig's default.
 - **If reversed:** agents check their work with their own tools, or not at all.
 
 ---

@@ -132,13 +132,38 @@ func (t *tools) fail(name string, a service.Actor, err error) *mcp.CallToolResul
 	var ce *service.ConflictError
 	if errors.As(err, &ce) {
 		b, _ := json.MarshalIndent(ce, "", "  ")
-		return errorResult(ce.Error() + "\nMerge your change into the current content below and publish again, passing current_blob as base.\n" + string(b))
+		return errorResult(ce.Error() + "\n" + conflictHint(ce) + "\n" + string(b))
 	}
 	if service.KindOf(err) == 0 {
 		t.log.Error("tool failed", zap.String("tool", name), zap.String("by", a.Name()), zap.Error(err))
 		return errorResult("internal error; the server log has the details")
 	}
 	return errorResult(err.Error())
+}
+
+// conflictHint says what to do with a conflict. The current content comes
+// along only for files sent inline and small enough; for uploads and large
+// files the agent reads the current version itself.
+func conflictHint(ce *service.ConflictError) string {
+	with, without := 0, 0
+	for _, f := range ce.Files {
+		switch {
+		case f.Current == "": // gone: nothing to merge
+		case f.Content != "" || f.ContentBase64 != "":
+			with++
+		default:
+			without++
+		}
+	}
+	switch {
+	case with == 0 && without == 0:
+		return "Those files are gone: drop the changes that move or delete them, and write them again without a base."
+	case without == 0:
+		return "Merge your change into the current content below and publish again, passing current_blob as base."
+	case with == 0:
+		return "Publish again passing current_blob as base, once your change includes what the current version has: read_file shows it."
+	}
+	return "Merge your change into the current version and publish again, passing current_blob as base. The current content is below where it came along; read_file shows the others."
 }
 
 func errorResult(msg string) *mcp.CallToolResult {

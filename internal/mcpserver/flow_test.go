@@ -99,6 +99,13 @@ func TestMCPUploadPublishScreenshot(t *testing.T) {
 	if out, isErr, text := call(t, s, "publish", map[string]any{"project": "made-by-publish", "changes": []any{map[string]any{"path": "a.html", "content": "a"}}}); isErr || out["project_created"] != true {
 		t.Fatalf("publish creating: %s", text)
 	}
+	// Publishing an upload over an existing file without its base: the
+	// conflict names the current blob, and sends the agent to read_file
+	// rather than to content that isn't there.
+	_, isErr, text = call(t, s, "publish", map[string]any{"project": "shots", "changes": changes[:1]})
+	if !isErr || !strings.Contains(text, "current_blob") || !strings.Contains(text, "read_file shows it") || strings.Contains(text, "current_content") {
+		t.Fatalf("upload conflict: %s", text)
+	}
 
 	if shots == nil {
 		t.Skip("no Chromium on PATH: screenshot not checked")
