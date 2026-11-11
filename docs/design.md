@@ -689,10 +689,12 @@ own it would be one more request holding up the artifact's first paint, on every
 cache for a frame without an origin (decision 10, Costs). The script talks to the app through `postMessage`:
 
 - **First paint:** it says when the artifact has first drawn itself, two animation frames after its document is
-  parsed, which is after its stylesheets have arrived. Until then the app shows a spinner in the artifact's box
-  instead of the frame, which would be empty and white; the iframe's `load` event is the fallback. The app says
-  hello when it starts listening, and the bridge answers with what it already sent, for an artifact that loaded
-  first.
+  parsed, which is after its stylesheets have arrived, and sends the artifact's background colour with it. The
+  pages draw the artifact's box loading: a spinner instead of the frame, which would be empty and white. The app
+  shows the frame two frames after that message, coloured with the artifact's background, so even a frame shown
+  a moment before its content is the right colour. The iframe's `load` is only a fallback, half a second later:
+  it comes before the artifact's first frame is on screen. The app says hello when it starts listening, and the
+  bridge answers with what it already sent, for an artifact that loaded first.
 - **Size:** it reports the artifact's height, so the iframe fits the content. The page scrolls, not the
   artifact. An artifact with its own height keeps its frame that tall instead, and scrolls itself; the bridge
   then scrolls it to a thread's pin, and leaves `#anchor` links to the browser.

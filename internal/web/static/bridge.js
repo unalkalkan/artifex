@@ -285,7 +285,7 @@
       case 'artifex:measure': lastHeight = 0; schedule(); break;
       // The app may start listening after this artifact has loaded: it says
       // hello, and gets the messages it missed again.
-      case 'artifex:hello': if (isReady) send('ready'); if (hasPainted) send('painted'); break;
+      case 'artifex:hello': if (isReady) send('ready'); if (hasPainted) sendPainted(); break;
     }
   });
 
@@ -305,10 +305,22 @@
    * document is parsed, its stylesheets are in and it has been drawn; "load"
    * is the fallback, for a browser that doesn't animate a frame it hides. */
   var isReady = false, hasPainted = false;
+  // The artifact's own background, so the app colours the frame with it: a
+  // frame shown a moment before its content arrives is then the right colour.
+  function background() {
+    var els = [document.documentElement, document.body];
+    for (var i = 0; i < els.length; i++) {
+      if (!els[i]) continue;
+      var c = getComputedStyle(els[i]).backgroundColor;
+      if (c && c !== 'transparent' && !/^rgba\(.*,\s*0\)$/.test(c)) return c;
+    }
+    return '';
+  }
+  function sendPainted() { send('painted', { bg: background() }); }
   function onPainted() {
     if (hasPainted) return;
     hasPainted = true;
-    send('painted');
+    sendPainted();
   }
   function onReady() {
     isReady = true;

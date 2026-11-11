@@ -141,15 +141,31 @@
     else iframe.style.width = '100%';
     iframe.style.height = (this.fixed || this.opts.minHeight || 600) + 'px';
     // Until the artifact has drawn itself, its box shows a spinner instead of
-    // an empty white frame: the bridge says "painted", and the iframe's load
-    // is the fallback. An artifact that loaded before this script ran answers
-    // the hello with what it already sent.
+    // an empty white frame (the pages draw it loading). The bridge says
+    // "painted"; the iframe's load only starts a fallback, as it comes before
+    // the artifact's first frame is on screen. An artifact that loaded before
+    // this script ran answers the hello with what it already sent.
     var self = this;
     box.classList.add('loading');
-    iframe.addEventListener('load', function () { self.shown(); });
+    iframe.addEventListener('load', function () {
+      clearTimeout(self.fallback);
+      self.fallback = setTimeout(function () { self.shown(); }, 500);
+    });
     this.post('hello');
   }
+  Frame.prototype.painted = function (bg) {
+    // Only a plain colour from the computed style: an artifact can't make the
+    // app load anything through it.
+    if (typeof bg === 'string' && /^rgba?\([\d.,\s%]+\)$/.test(bg)) {
+      this.iframe.style.background = bg;
+      this.box.style.background = bg;
+    }
+    // Two frames more, so the artifact's frame is on screen when it shows.
+    var self = this;
+    requestAnimationFrame(function () { requestAnimationFrame(function () { self.shown(); }); });
+  };
   Frame.prototype.shown = function () {
+    clearTimeout(this.fallback);
     this.box.classList.remove('loading');
   };
   Frame.prototype.post = function (type, data) {
@@ -207,7 +223,7 @@
       if (e.source !== f.iframe.contentWindow) continue;
       var t = m.type.slice(8);
       if (t === 'size') f.onSize(m.height);
-      if (t === 'painted') f.shown();
+      if (t === 'painted') f.painted(m.bg);
       if (f.opts.on && f.opts.on[t]) f.opts.on[t](m, f);
       return;
     }

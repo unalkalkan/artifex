@@ -15,11 +15,11 @@
   <div class="compare" id="compare" data-width="{{.Frames.width}}" data-height="{{.Frames.height}}">
     <figure class="card">
       <figcaption class="card-header"><h3 class="card-title">Before{{if .From}} <code class="ms-2">{{short .From}}</code>{{end}}</h3></figcaption>
-      <div class="board-box">{{if .FromURL}}<iframe title="Before" sandbox="{{sandbox}}" src="{{.FromURL}}"></iframe>{{else}}<p class="text-secondary p-4 m-0">The artifact didn't exist yet.</p>{{end}}</div>
+      <div class="board-box{{if .FromURL}} loading{{end}}">{{if .FromURL}}<iframe title="Before" sandbox="{{sandbox}}" src="{{.FromURL}}"></iframe>{{else}}<p class="text-secondary p-4 m-0">The artifact didn't exist yet.</p>{{end}}</div>
     </figure>
     <figure class="card">
       <figcaption class="card-header"><h3 class="card-title">After <code class="ms-2">{{short .To}}</code></h3></figcaption>
-      <div class="board-box"><iframe title="After" sandbox="{{sandbox}}" src="{{.ToURL}}"></iframe></div>
+      <div class="board-box loading"><iframe title="After" sandbox="{{sandbox}}" src="{{.ToURL}}"></iframe></div>
     </figure>
   </div>
   {{end}}

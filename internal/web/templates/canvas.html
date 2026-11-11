@@ -26,7 +26,7 @@
     {{range .Frames}}
     <section class="board" data-path="{{.Path}}" data-width="{{.Width}}" data-height="{{.Height}}">
       <h2 class="board-title"><a href="/p/{{$P.Project.ID}}/{{esc .Path}}{{if $ver}}?v={{$ver}}{{end}}">{{.Title}}</a>{{if .Open}} <span class="badge bg-orange-lt" title="Open comments">{{icon "message-circle" "icon-sm"}}{{.Open}}</span>{{end}}</h2>
-      <div class="board-box"><iframe title="{{.Title}}" loading="lazy" sandbox="{{sandbox}}" src="{{.URL}}" data-path="{{.Path}}"></iframe></div>
+      <div class="board-box loading"><iframe title="{{.Title}}" loading="lazy" sandbox="{{sandbox}}" src="{{.URL}}" data-path="{{.Path}}"></iframe></div>
     </section>
     {{end}}
   </div>

@@ -181,8 +181,10 @@ body.wide .page-wrapper { min-height: 0; overflow: hidden; }
 .stage.fill { padding: 0; }
 .frame-box { margin: 0 auto; position: relative; background: #fff; box-shadow: 0 .25rem 1.5rem rgba(0, 0, 0, .45); overflow: hidden; }
 .stage.fill .frame-box { box-shadow: none; }
-.frame-box iframe, .board-box iframe { border: 0; display: block; background: #fff; transform-origin: 0 0; transition: opacity .12s ease-out; }
-/* While an artifact loads, its box shows a spinner instead of an empty white frame (app.js, Frame). */
+.frame-box iframe, .board-box iframe { border: 0; display: block; background: #fff; transform-origin: 0 0; }
+.frame-box:not(.loading) iframe, .board-box:not(.loading) iframe { transition: opacity .12s ease-out; }
+/* While an artifact loads, its box shows a spinner instead of an empty white frame. The pages draw the boxes
+   loading, and app.js (Frame) shows the artifact once it has drawn itself. */
 .frame-box.loading, .board-box.loading { background: var(--tblr-bg-surface-secondary); }
 .frame-box.loading iframe, .board-box.loading iframe { opacity: 0; }
 .frame-box.loading::after, .board-box.loading::after {
