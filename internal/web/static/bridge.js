@@ -3,6 +3,8 @@
  * it serves; the file in the project never contains it. The artifact runs
  * with no origin of its own, so this script talks to the app only through
  * postMessage. It:
+ *  - tells the app when the artifact has first drawn itself, so the app shows
+ *    the frame only then, not empty and white;
  *  - reports the artifact's height, so the app sizes the iframe and the page,
  *    not the artifact, scrolls (unless the artifact has a height of its own:
  *    then the app keeps its frame that tall and the artifact scrolls itself);
@@ -281,6 +283,9 @@
       case 'artifex:pins': ensureOverlay(); pinData = m.pins || []; placePins(); break;
       case 'artifex:focus': activePin = m.id || 0; placePins(); reveal(); break;
       case 'artifex:measure': lastHeight = 0; schedule(); break;
+      // The app may start listening after this artifact has loaded: it says
+      // hello, and gets the messages it missed again.
+      case 'artifex:hello': if (isReady) send('ready'); if (hasPainted) send('painted'); break;
     }
   });
 
@@ -294,10 +299,24 @@
   }, true);
   document.addEventListener('click', onClick, false);
 
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', function () { watchSize(); send('ready'); });
-  } else {
+  /* ---------- first paint ----------
+   * The app keeps the frame hidden until the artifact has drawn itself, so a
+   * reader never sees an empty white frame. Two animation frames after the
+   * document is parsed, its stylesheets are in and it has been drawn; "load"
+   * is the fallback, for a browser that doesn't animate a frame it hides. */
+  var isReady = false, hasPainted = false;
+  function onPainted() {
+    if (hasPainted) return;
+    hasPainted = true;
+    send('painted');
+  }
+  function onReady() {
+    isReady = true;
     watchSize();
     send('ready');
+    requestAnimationFrame(function () { requestAnimationFrame(onPainted); });
   }
+  window.addEventListener('load', onPainted);
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', onReady);
+  else onReady();
 })();

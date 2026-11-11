@@ -292,6 +292,11 @@ agent wants to show (decision 5). Everything below holds for mockups too.
   - Fonts and module scripts load in CORS mode, so content responses carry
     `Access-Control-Allow-Origin: *`.
   - Artifacts can't use cookies or `localStorage`.
+  - Nothing an artifact loads is cached. Chromium keeps no HTTP cache for a frame without an origin, so every
+    view downloads the artifact's stylesheets, scripts and images again (tested 2026-11-11: the same file with
+    `max-age` and `immutable`, three loads, three downloads; a frame with an origin downloaded it once). The
+    addresses also change with every view, as the signature carries the time. A second hostname with
+    `allow-same-origin` would make them cacheable (below).
 - **Rejected:**
   - **Iframes on the app's own origin:** any artifact's script could act as the viewer.
   - **A second hostname for content**, as Claude uses: just as safe, but it needs another DNS name and
@@ -678,9 +683,16 @@ An artifact opens at its width, or at the window's width when it has none. Its t
 
 ### 4.4 The bridge
 
-The server adds one script to every artifact it serves. The files in the repository don't contain it. The
-script talks to the app through `postMessage`:
+The server adds one script to every artifact it serves. The files in the repository don't contain it. It goes
+into the page inline, at the start of `<head>`, so it runs before the artifact's own scripts. As a file of its
+own it would be one more request holding up the artifact's first paint, on every view: Chromium keeps no HTTP
+cache for a frame without an origin (decision 10, Costs). The script talks to the app through `postMessage`:
 
+- **First paint:** it says when the artifact has first drawn itself, two animation frames after its document is
+  parsed, which is after its stylesheets have arrived. Until then the app shows a spinner in the artifact's box
+  instead of the frame, which would be empty and white; the iframe's `load` event is the fallback. The app says
+  hello when it starts listening, and the bridge answers with what it already sent, for an artifact that loaded
+  first.
 - **Size:** it reports the artifact's height, so the iframe fits the content. The page scrolls, not the
   artifact. An artifact with its own height keeps its frame that tall instead, and scrolls itself; the bridge
   then scrolls it to a thread's pin, and leaves `#anchor` links to the browser.

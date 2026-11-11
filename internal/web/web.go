@@ -92,7 +92,11 @@ func New(svc *service.Service, key []byte, log *zap.Logger) (*Server, error) {
 	if s.icons, err = loadIcons(); err != nil {
 		return nil, err
 	}
-	s.content = content.New(svc, key, svc.Config().BaseURL+s.asset("bridge.js"))
+	bridge, err := staticFS.ReadFile("static/bridge.js")
+	if err != nil {
+		return nil, err
+	}
+	s.content = content.New(svc, key, bridge)
 	if err := s.parseTemplates(); err != nil {
 		return nil, err
 	}
@@ -183,9 +187,6 @@ func (s *Server) static(w http.ResponseWriter, r *http.Request) {
 	case ".svg":
 		h.Set("Content-Type", "image/svg+xml")
 	}
-	// Artifacts run with no origin and load the bridge from here.
-	h.Set("Cross-Origin-Resource-Policy", "cross-origin")
-	h.Set("Access-Control-Allow-Origin", "*")
 	h.Set("X-Content-Type-Options", "nosniff")
 	if r.URL.Query().Get("v") == s.assets[name] {
 		h.Set("Cache-Control", "public, max-age=31536000, immutable")

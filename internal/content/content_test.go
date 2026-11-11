@@ -42,7 +42,8 @@ func TestSignedContent(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	srv := New(svc, []byte("0123456789abcdef0123456789abcdef"), "http://artifex.test/static/bridge.js?v=1")
+	// A bridge with "</script>" in a string: it must not end the element it is inlined in.
+	srv := New(svc, []byte("0123456789abcdef0123456789abcdef"), []byte(`var bridge = "</script>";`))
 	mux := http.NewServeMux()
 	mux.Handle("/c/", srv)
 
@@ -55,8 +56,12 @@ func TestSignedContent(t *testing.T) {
 	// The folder serves its index.html, with the bridge injected and the CSP sandbox.
 	resp := get(srv.Prefix("p", r.Version) + "f/")
 	body, _ := io.ReadAll(resp.Body)
-	if resp.StatusCode != 200 || !strings.Contains(string(body), `<head><script src="http://artifex.test/static/bridge.js?v=1"></script><title>`) {
+	if resp.StatusCode != 200 || !strings.Contains(string(body), `<head><script>var bridge = "<\/script>";</script><title>`) {
 		t.Fatalf("index: %d %s", resp.StatusCode, body)
+	}
+	// The page's ETag names the bridge too, so a new release isn't hidden behind a cached page.
+	if etag := resp.Header.Get("ETag"); !strings.Contains(etag, "-") {
+		t.Fatalf("etag: %s", etag)
 	}
 	if csp := resp.Header.Get("Content-Security-Policy"); !strings.Contains(csp, "sandbox allow-scripts") || strings.Contains(csp, "allow-same-origin") {
 		t.Fatalf("csp: %s", csp)

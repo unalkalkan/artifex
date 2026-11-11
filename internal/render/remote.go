@@ -93,7 +93,7 @@ func (r *Remote) Render(ctx context.Context, req Request) (Result, error) {
 }
 
 // Proxy is the Upstream of a renderer container: it fetches Artifex's
-// content and bridge from Artifex's address on their shared network. Only
+// content from Artifex's address on their shared network. Only
 // /c/ and /static/ reach it (run.serve).
 func Proxy(upstream string) (http.Handler, error) {
 	u, err := url.Parse(upstream)

@@ -124,8 +124,8 @@ type Browser struct {
 	// namespaces that containers usually lack. Only where the container is
 	// the sandbox: the renderer's own (decision 24).
 	NoSandbox bool
-	// Upstream serves Artifex's origin: content under /c/ and the bridge
-	// under /static/.
+	// Upstream serves Artifex's origin: content under /c/ (HTML carries the
+	// bridge inline) and the app's files under /static/.
 	Upstream http.Handler
 
 	once sync.Once

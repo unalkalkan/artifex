@@ -43,7 +43,8 @@ type Server struct {
 	key    []byte
 	origin string
 	ttl    time.Duration
-	bridge string // the bridge script's address, with a version for caching
+	bridge []byte // the bridge as an inline <script> element
+	tagVer string // a short hash of the bridge, part of an HTML file's ETag
 	csp    string
 
 	mu    sync.Mutex
@@ -51,7 +52,9 @@ type Server struct {
 	size  int
 }
 
-func New(svc *service.Service, key []byte, bridgeURL string) *Server {
+// New makes the content server. bridgeJS is the bridge's source (design §4.4), which every HTML file gets
+// inline.
+func New(svc *service.Service, key []byte, bridgeJS []byte) *Server {
 	cfg := svc.Config()
 	o := cfg.Origin()
 	src := "'self' " + o + " data: blob:"
@@ -71,7 +74,12 @@ func New(svc *service.Service, key []byte, bridgeURL string) *Server {
 		"frame-ancestors " + o,
 		"sandbox " + Sandbox,
 	}, "; ")
-	return &Server{svc: svc, key: key, origin: o, ttl: cfg.Limits.ContentURLTTL, bridge: bridgeURL, csp: csp, blobs: map[string][]byte{}}
+	// "</script" inside the source would end the element early; in JavaScript "<\/" reads as "</".
+	js := bytes.ReplaceAll(bridgeJS, []byte("</"), []byte(`<\/`))
+	tag := append(append([]byte("<script>"), js...), "</script>"...)
+	sum := sha256.Sum256(bridgeJS)
+	return &Server{svc: svc, key: key, origin: o, ttl: cfg.Limits.ContentURLTTL, bridge: tag,
+		tagVer: base64.RawURLEncoding.EncodeToString(sum[:6]), csp: csp, blobs: map[string][]byte{}}
 }
 
 // CSP is the Content-Security-Policy every content response carries.
@@ -194,6 +202,8 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ctype := contentType(p, data)
 	if strings.HasPrefix(ctype, "text/html") {
 		data = s.inject(data)
+		// The page carries the bridge too, so a new Artifex release is a new page.
+		h.Set("ETag", `"`+e.ID+"-"+s.tagVer+`"`)
 	}
 	h.Set("Content-Type", ctype)
 	http.ServeContent(w, r, "", time.Time{}, bytes.NewReader(data))
@@ -228,10 +238,12 @@ const streamAbove = 2 << 20
 var headOpen = regexp.MustCompile(`(?i)<head(\s[^>]*)?>`)
 
 // inject adds the bridge script (design §4.4) at the start of <head>, so it
-// runs before the artifact's own scripts. The file in the repository is
-// never changed.
+// runs before the artifact's own scripts. It goes in inline: as a separate
+// file it would be one more request that holds up the artifact's first paint,
+// on every view, because browsers don't cache what an iframe without an
+// origin loads. The file in the repository is never changed.
 func (s *Server) inject(data []byte) []byte {
-	tag := []byte(`<script src="` + s.bridge + `"></script>`)
+	tag := s.bridge
 	if loc := headOpen.FindIndex(data); loc != nil {
 		out := make([]byte, 0, len(data)+len(tag))
 		out = append(out, data[:loc[1]]...)

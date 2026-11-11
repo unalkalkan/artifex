@@ -40,12 +40,9 @@ func TestMCPUploadPublishScreenshot(t *testing.T) {
 	defer st.Close()
 	svc := service.New(cfg, st, events.NewHub(), zap.NewNop())
 	key := []byte("0123456789abcdef0123456789abcdef")
-	cs := content.New(svc, key, base+"/static/bridge.js")
+	cs := content.New(svc, key, []byte("/* bridge */"))
 	mux := http.NewServeMux()
 	mux.Handle("/c/", cs)
-	mux.HandleFunc("/static/bridge.js", func(w http.ResponseWriter, _ *http.Request) {
-		w.Header().Set("Content-Type", "text/javascript")
-	})
 	mux.Handle("/u/", upload.New(svc, key, zap.NewNop()))
 	var shots render.Renderer
 	if p := render.FindChromium(); p != "" {

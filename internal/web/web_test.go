@@ -112,7 +112,7 @@ func TestPagesAndProtections(t *testing.T) {
 		t.Fatal("no frame")
 	}
 	resp, cbody := get(strings.TrimPrefix(strings.ReplaceAll(m[1], "&amp;", "&"), base))
-	if resp.StatusCode != 200 || !strings.Contains(resp.Header.Get("Content-Security-Policy"), "sandbox") || !strings.Contains(cbody, "/static/bridge.js") {
+	if resp.StatusCode != 200 || !strings.Contains(resp.Header.Get("Content-Security-Policy"), "sandbox") || !strings.Contains(cbody, "window.__artifexBridge") {
 		t.Fatalf("content: %d %s", resp.StatusCode, resp.Header.Get("Content-Security-Policy"))
 	}
 

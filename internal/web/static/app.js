@@ -140,7 +140,18 @@
     if (this.width) iframe.style.width = this.width + 'px';
     else iframe.style.width = '100%';
     iframe.style.height = (this.fixed || this.opts.minHeight || 600) + 'px';
+    // Until the artifact has drawn itself, its box shows a spinner instead of
+    // an empty white frame: the bridge says "painted", and the iframe's load
+    // is the fallback. An artifact that loaded before this script ran answers
+    // the hello with what it already sent.
+    var self = this;
+    box.classList.add('loading');
+    iframe.addEventListener('load', function () { self.shown(); });
+    this.post('hello');
   }
+  Frame.prototype.shown = function () {
+    this.box.classList.remove('loading');
+  };
   Frame.prototype.post = function (type, data) {
     var m = data || {};
     m.type = 'artifex:' + type;
@@ -184,6 +195,7 @@
   Frame.prototype.reload = function (url) {
     this.locked = false;
     this.growth = [];
+    this.box.classList.add('loading');
     this.iframe.src = url;
   };
 
@@ -195,6 +207,7 @@
       if (e.source !== f.iframe.contentWindow) continue;
       var t = m.type.slice(8);
       if (t === 'size') f.onSize(m.height);
+      if (t === 'painted') f.shown();
       if (f.opts.on && f.opts.on[t]) f.opts.on[t](m, f);
       return;
     }
